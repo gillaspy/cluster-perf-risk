@@ -10,6 +10,7 @@ from typing import Optional
 
 from aria.ops.definition.adapter_definition import AdapterDefinition
 from aria.ops.object import Identifier
+from aria.ops.object import Object
 from aria.ops.result import CollectResult
 from aria.ops.suite_api_client import SuiteApiClient
 from constants_cluster import BAND_PROPERTY_LABELS
@@ -156,7 +157,7 @@ def build_object(
     cluster_id: str,
     cluster_name: str,
     metric_values: dict[str, Optional[float]],
-) -> None:
+) -> Object:
     composite_score, composite_band, per_metric_band = scoring.compute_composite(
         metric_values, BAND_BOUNDS, WEIGHTS
     )
@@ -183,6 +184,8 @@ def build_object(
 
     obj.with_metric(METRIC_COMPOSITE_SCORE, composite_score)
     obj.with_property(PROP_COMPOSITE_BAND, composite_band)
+
+    return obj
 
 
 def _highest_host_stat(client: SuiteApiClient, cluster_id: str, statkey: str) -> Optional[float]:

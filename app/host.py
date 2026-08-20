@@ -13,6 +13,7 @@ from typing import Optional
 
 from aria.ops.definition.adapter_definition import AdapterDefinition
 from aria.ops.object import Identifier
+from aria.ops.object import Object
 from aria.ops.result import CollectResult
 from constants_host import HOST_BAND_PROPERTY_LABELS
 from constants_host import HOST_METRIC_COMPOSITE_SCORE
@@ -108,7 +109,7 @@ def build_object(
     host_name: str,
     cluster_name: str,
     host_metric_values: dict[str, Optional[float]],
-) -> None:
+) -> Object:
     composite_score, composite_band, per_metric_band = scoring.compute_composite(
         host_metric_values, BAND_BOUNDS, WEIGHTS
     )
@@ -140,3 +141,5 @@ def build_object(
 
     host_obj.with_metric(HOST_METRIC_COMPOSITE_SCORE, composite_score)
     host_obj.with_property(HOST_PROP_COMPOSITE_BAND, composite_band)
+
+    return host_obj

@@ -111,12 +111,22 @@ def collect(adapter_instance: AdapterInstance) -> CollectResult:
                     )
                     metric_values.update(cluster_vm_metrics)
 
-                    cluster.build_object(result, cluster_id, cluster_name, metric_values)
+                    cluster_obj = cluster.build_object(
+                        result, cluster_id, cluster_name, metric_values
+                    )
 
                     for host_id, host_name, host_metric_values in host_records:
-                        host.build_object(
+                        host_obj = host.build_object(
                             result, host_id, host_name, cluster_name, host_metric_values
                         )
+                        # Establishes the real parent/child relationship in VCF
+                        # Operations' object graph -- without this, dashboard
+                        # widget interactions using a "Children" traversal from
+                        # the cluster object (e.g. drilling into a cluster's
+                        # hosts) find nothing, since "cluster_name" on the host
+                        # object is only an informational property, not a graph
+                        # edge.
+                        cluster_obj.add_child(host_obj)
 
         except Exception as e:
             logger.error("Unexpected collection error")
