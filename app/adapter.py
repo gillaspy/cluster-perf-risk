@@ -25,6 +25,7 @@ from constants_shared import ADAPTER_NAME
 from constants_shared import DEFAULT_MONSTER_VM_THRESHOLD_PCT
 from constants_shared import PARAM_MONSTER_VM_THRESHOLD_PCT
 from constants_shared import RESOURCE_KIND_CLUSTER
+from constants_shared import RESOURCE_KIND_HOST
 from constants_shared import VMWARE_ADAPTER_KIND
 from suite_api import fetch_resources
 from traversal import collect_cluster_and_host_metrics
@@ -80,7 +81,13 @@ def test(adapter_instance: AdapterInstance) -> TestResult:
 
 def collect(adapter_instance: AdapterInstance) -> CollectResult:
     with Timer(logger, "Collection"):
-        result = CollectResult()
+        # target_definition matters here, not just for validation: it's what
+        # lets CollectResult recognize the VMWARE reference objects below as
+        # *external* (adapter_kind "VMWARE" != ADAPTER_KIND) and omit them
+        # from the "result" list since they carry no metrics/properties --
+        # while still emitting the parent/child relationship that nests our
+        # objects under them in the Environment tree.
+        result = CollectResult(target_definition=get_adapter_definition())
         client = adapter_instance.get_suite_api_client()
         if client is None:
             result.with_error(
@@ -104,7 +111,7 @@ def collect(adapter_instance: AdapterInstance) -> CollectResult:
         try:
             with client:
                 clusters = fetch_resources(client, RESOURCE_KIND_CLUSTER, VMWARE_ADAPTER_KIND)
-                for cluster_id, cluster_name in clusters:
+                for cluster_id, cluster_name, cluster_identifiers in clusters:
                     metric_values = cluster.gather_metric_values(client, cluster_id)
                     cluster_vm_metrics, host_records = collect_cluster_and_host_metrics(
                         client, cluster_id, monster_vm_threshold_pct
@@ -115,7 +122,22 @@ def collect(adapter_instance: AdapterInstance) -> CollectResult:
                         result, cluster_id, cluster_name, metric_values
                     )
 
-                    for host_id, host_name, host_metric_values in host_records:
+                    # Same-identity reference to the *native* VMWARE cluster
+                    # object -- no metrics/properties added, it exists only
+                    # to nest cluster_obj underneath the real cluster in the
+                    # Environment tree instead of as a standalone top-level
+                    # object. Must match the native adapter's own identifiers
+                    # exactly, or VCF Operations creates a phantom duplicate
+                    # cluster instead of attaching to the real one.
+                    vmware_cluster_ref = result.object(
+                        VMWARE_ADAPTER_KIND,
+                        RESOURCE_KIND_CLUSTER,
+                        cluster_name,
+                        identifiers=cluster_identifiers,
+                    )
+                    vmware_cluster_ref.add_child(cluster_obj)
+
+                    for host_id, host_name, host_identifiers, host_metric_values in host_records:
                         host_obj = host.build_object(
                             result, host_id, host_name, cluster_name, host_metric_values
                         )
@@ -127,6 +149,16 @@ def collect(adapter_instance: AdapterInstance) -> CollectResult:
                         # object is only an informational property, not a graph
                         # edge.
                         cluster_obj.add_child(host_obj)
+
+                        # Same nesting trick as vmware_cluster_ref above, for
+                        # the native HostSystem object.
+                        vmware_host_ref = result.object(
+                            VMWARE_ADAPTER_KIND,
+                            RESOURCE_KIND_HOST,
+                            host_name,
+                            identifiers=host_identifiers,
+                        )
+                        vmware_host_ref.add_child(host_obj)
 
         except Exception as e:
             logger.error("Unexpected collection error")

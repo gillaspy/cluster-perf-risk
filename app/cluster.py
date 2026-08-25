@@ -35,6 +35,7 @@ from constants_cluster import OBJECT_LABEL_CLUSTER_RISK
 from constants_cluster import PROP_COMPOSITE_BAND
 from constants_cluster import VM_COUNT_PER_HOST_STATKEY
 from constants_shared import ADAPTER_KIND
+from constants_shared import CHILD_DISPLAY_NAME
 from constants_shared import MEMORY_BALLOON_KB_STATKEY
 from constants_shared import MEMORY_TOTAL_CAPACITY_KB_STATKEY
 from constants_shared import METRIC_HOST_DROPPED_PACKETS
@@ -165,7 +166,7 @@ def build_object(
     obj = result.object(
         ADAPTER_KIND,
         OBJECT_KIND_CLUSTER_RISK,
-        f"{cluster_name} - Perf Risk",
+        CHILD_DISPLAY_NAME,
         identifiers=[
             Identifier(IDENTIFIER_CLUSTER_VCF_ID, cluster_id),
             Identifier(
@@ -193,7 +194,10 @@ def _highest_host_stat(client: SuiteApiClient, cluster_id: str, statkey: str) ->
 
     values = [
         v
-        for v in (latest_stat(client, host_id, statkey) for host_id, _host_name in host_ids)
+        for v in (
+            latest_stat(client, host_id, statkey)
+            for host_id, _host_name, _host_identifiers in host_ids
+        )
         if v is not None
     ]
     return max(values) if values else None
@@ -208,7 +212,7 @@ def _highest_host_ballooned_pct(client: SuiteApiClient, cluster_id: str) -> Opti
     host_ids = fetch_child_hosts(client, cluster_id)
 
     ratios = []
-    for host_id, _host_name in host_ids:
+    for host_id, _host_name, _host_identifiers in host_ids:
         ballooned_kb = latest_stat(client, host_id, MEMORY_BALLOON_KB_STATKEY)
         total_kb = latest_stat(client, host_id, MEMORY_TOTAL_CAPACITY_KB_STATKEY)
         if ballooned_kb is not None and total_kb:
@@ -231,7 +235,10 @@ def _host_cpu_imbalance_pct(client: SuiteApiClient, cluster_id: str) -> Optional
 
     values = [
         v
-        for v in (latest_stat(client, host_id, cpu_statkey) for host_id, _host_name in host_ids)
+        for v in (
+            latest_stat(client, host_id, cpu_statkey)
+            for host_id, _host_name, _host_identifiers in host_ids
+        )
         if v is not None
     ]
     return statistics.pstdev(values) if len(values) >= 2 else None
@@ -250,7 +257,7 @@ def _network_throughput_pct(client: SuiteApiClient, cluster_id: str) -> Optional
     host_ids = fetch_child_hosts(client, cluster_id)
 
     ratios = []
-    for host_id, _host_name in host_ids:
+    for host_id, _host_name, _host_identifiers in host_ids:
         usage_kbps = latest_stat(client, host_id, NETWORK_USAGE_AVERAGE_STATKEY)
         linkspeed_str = get_property(client, host_id, HOST_LINKSPEED_PROPERTY)
         if usage_kbps is None or not linkspeed_str:

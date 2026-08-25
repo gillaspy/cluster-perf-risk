@@ -32,6 +32,7 @@ from constants_host import IDENTIFIER_HOST_VCF_ID
 from constants_host import OBJECT_KIND_HOST_RISK
 from constants_host import OBJECT_LABEL_HOST_RISK
 from constants_shared import ADAPTER_KIND
+from constants_shared import CHILD_DISPLAY_NAME
 from constants_shared import METRIC_HOST_DROPPED_PACKETS
 from constants_shared import METRIC_HOST_MEMORY_CONTENTION
 from constants_shared import METRIC_P90_DISK_LATENCY
@@ -117,7 +118,7 @@ def build_object(
     host_obj = result.object(
         ADAPTER_KIND,
         OBJECT_KIND_HOST_RISK,
-        f"{host_name} - Perf Risk",
+        CHILD_DISPLAY_NAME,
         identifiers=[
             Identifier(IDENTIFIER_HOST_VCF_ID, host_id),
             Identifier(
