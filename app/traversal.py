@@ -20,7 +20,6 @@ from __future__ import annotations
 import math
 from typing import Optional
 
-from aria.ops.object import Identifier
 from aria.ops.suite_api_client import SuiteApiClient
 from constants_cluster import METRIC_CLUSTER_CPU_MONSTER_VM_RATIO
 from constants_cluster import METRIC_CLUSTER_MEMORY_MONSTER_VM_RATIO
@@ -84,17 +83,11 @@ def _worst_p90_into(
 
 def collect_cluster_and_host_metrics(
     client: SuiteApiClient, cluster_id: str, monster_vm_threshold_pct: float
-) -> tuple[
-    dict[str, Optional[float]],
-    list[tuple[str, str, list[Identifier], dict[str, Optional[float]]]],
-]:
+) -> tuple[dict[str, Optional[float]], list[tuple[str, str, dict[str, Optional[float]]]]]:
     """
     Returns (cluster_metric_values, host_records) where host_records is a
-    list of (host_id, host_name, host_identifiers, host_metric_values)
-    tuples, one per host, each independently ready for its own
-    compute_composite() call. host_identifiers is the host's native VMWARE
-    resource identity, passed through so adapter.py can nest the host's risk
-    object under the real HostSystem object in the Environment tree.
+    list of (host_id, host_name, host_metric_values) tuples, one per host,
+    each independently ready for its own compute_composite() call.
     """
     host_ids_and_names = fetch_child_hosts(client, cluster_id)
 
@@ -104,9 +97,9 @@ def collect_cluster_and_host_metrics(
     cluster_vm_samples: dict[str, list[float]] = {key: [] for key in VM_LEVEL_STATKEYS}
     host_memory_contention_samples = []
     host_dropped_packets_samples = []
-    host_records: list[tuple[str, str, list[Identifier], dict[str, Optional[float]]]] = []
+    host_records: list[tuple[str, str, dict[str, Optional[float]]]] = []
 
-    for host_id, host_name, host_identifiers in host_ids_and_names:
+    for host_id, host_name in host_ids_and_names:
         host_cores = latest_stat(client, host_id, HOST_CPU_CORES_STATKEY)
         host_mem_kb = latest_stat(client, host_id, MEMORY_TOTAL_CAPACITY_KB_STATKEY)
         host_has_capacity_data = bool(host_cores or host_mem_kb)
@@ -143,7 +136,7 @@ def collect_cluster_and_host_metrics(
         host_total_vcpu = 0.0
         host_total_vmem_kb = 0.0
 
-        for vm_id, _vm_name, _vm_identifiers in vm_records:
+        for vm_id, _vm_name in vm_records:
             vcpu = latest_stat(client, vm_id, VM_NUM_CPU_STATKEY)
             if vcpu is not None:
                 host_total_vcpu += vcpu
@@ -183,7 +176,7 @@ def collect_cluster_and_host_metrics(
             METRIC_HOST_DROPPED_PACKETS: host_dropped_pct,
         }
         _worst_p90_into(host_metric_values, host_vm_samples)
-        host_records.append((host_id, host_name, host_identifiers, host_metric_values))
+        host_records.append((host_id, host_name, host_metric_values))
 
     host_count = len(host_ids_and_names)
     cluster_results: dict[str, Optional[float]] = {

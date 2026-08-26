@@ -9,46 +9,21 @@ so these helpers call the Suite API directly instead.
 from typing import Any
 from typing import Optional
 
-from aria.ops.object import Identifier
 from aria.ops.suite_api_client import SuiteApiClient
 from constants_shared import RESOURCE_KIND_HOST
 
 
-def _resource_identifiers(resource_key: dict) -> list[Identifier]:
-    """
-    Translates a Suite API resourceKey's resourceIdentifiers array (raw
-    identifierType.name/value/isPartOfUniqueness triples) into SDK Identifier
-    objects -- the same identity the native VMWARE adapter uses for this
-    resource. Used to build a same-identity reference Object for the native
-    cluster/host, so a dependent object type can nest itself underneath the
-    real one in the Environment tree instead of appearing as a standalone
-    top-level object.
-    """
-    return [
-        Identifier(
-            identifier["identifierType"]["name"],
-            identifier["value"],
-            identifier["identifierType"]["isPartOfUniqueness"],
-        )
-        for identifier in resource_key.get("resourceIdentifiers", [])
-    ]
-
-
 def fetch_resources(
     client: SuiteApiClient, resource_kind: str, adapter_kind: str
-) -> list[tuple[str, str, list[Identifier]]]:
-    """Returns a list of (resource_id, resource_name, resource_identifiers) tuples."""
+) -> list[tuple[str, str]]:
+    """Returns a list of (resource_id, resource_name) tuples."""
     response = client.paged_post(
         "/api/resources/query",
         "resourceList",
         json={"resourceKind": [resource_kind], "adapterKind": [adapter_kind]},
     )
     return [
-        (
-            entry["identifier"],
-            entry["resourceKey"]["name"],
-            _resource_identifiers(entry["resourceKey"]),
-        )
+        (entry["identifier"], entry["resourceKey"]["name"])
         for entry in response.get("resourceList", [])
     ]
 
@@ -96,9 +71,8 @@ def get_property(client: SuiteApiClient, resource_id: str, property_name: str) -
 
 def fetch_children_of_kind(
     client: SuiteApiClient, resource_id: str, resource_kind: str
-) -> list[tuple[str, str, list[Identifier]]]:
-    """Returns (resource_id, resource_name, resource_identifiers) tuples of
-    resource_id's direct children of the given kind."""
+) -> list[tuple[str, str]]:
+    """Returns (resource_id, resource_name) tuples of resource_id's direct children of the given kind."""
     with client.get(
         f"/api/resources/{resource_id}/relationships",
         params={"relationshipType": "CHILD"},
@@ -107,19 +81,12 @@ def fetch_children_of_kind(
             return []
         body = response.json()
         return [
-            (
-                entry["identifier"],
-                entry["resourceKey"]["name"],
-                _resource_identifiers(entry["resourceKey"]),
-            )
+            (entry["identifier"], entry["resourceKey"]["name"])
             for entry in body.get("resourceList", [])
             if entry.get("resourceKey", {}).get("resourceKindKey") == resource_kind
         ]
 
 
-def fetch_child_hosts(
-    client: SuiteApiClient, cluster_id: str
-) -> list[tuple[str, str, list[Identifier]]]:
-    """Returns (host_id, host_name, host_identifiers) tuples of the cluster's
-    direct HostSystem children."""
+def fetch_child_hosts(client: SuiteApiClient, cluster_id: str) -> list[tuple[str, str]]:
+    """Returns (host_id, host_name) tuples of the cluster's direct HostSystem children."""
     return fetch_children_of_kind(client, cluster_id, RESOURCE_KIND_HOST)

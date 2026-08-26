@@ -13,14 +13,6 @@ RESOURCE_KIND_CLUSTER = "ClusterComputeResource"
 RESOURCE_KIND_HOST = "HostSystem"
 RESOURCE_KIND_VM = "VirtualMachine"
 
-# Display name for both risk object types once nested under their native
-# VMWARE cluster/host in the Environment tree (see adapter.py) -- the parent
-# already gives context, so the child just needs a short label. Object
-# identity is unaffected by this rename: both object types' VCF ID
-# identifier is is_part_of_uniqueness=True, so the Key is derived from that
-# identifier, not from this display name.
-CHILD_DISPLAY_NAME = "perf-risk"
-
 # Adapter parameter key for the monster-VM threshold (see get_adapter_definition
 # in adapter.py). Read via adapter_instance.get_identifier_value() at collect
 # time -- never hardcode the threshold in adapter.py. Feeds monster VM detection
