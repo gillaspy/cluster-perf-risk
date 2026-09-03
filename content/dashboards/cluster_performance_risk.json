@@ -390,16 +390,7 @@
             "title": "Cluster Metrics",
             "config": {
                "refreshInterval": 300,
-               "resource": [
-                  {
-                     "name": "vcf-mgmt-cl01 - Perf Risk",
-                     "id": "resource:id:3_::_"
-                  },
-                  {
-                     "name": "wld-cl01 - Perf Risk",
-                     "id": "resource:id:5_::_"
-                  }
-               ],
+               "resource": [],
                "refreshContent": {"refreshContent": false},
                "relationshipMode": {"relationshipMode": 0},
                "title": "Cluster Metrics",
@@ -461,7 +452,24 @@
                ],
                "mode": "all",
                "filterMode": "tagPicker",
-               "tagFilter": null,
+               "tagFilter": {
+                  "path": ["/source/kind/kind:resourceKind:id:0_::_"],
+                  "value": {
+                     "bus": [],
+                     "adapterKind": [],
+                     "kind": ["resourceKind:id:0_::_"],
+                     "exclaim": false,
+                     "healthRange": [],
+                     "maintenanceSchedule": [],
+                     "adapterInstance": [],
+                     "collector": [],
+                     "tier": [],
+                     "state": [],
+                     "tag": [],
+                     "day": [],
+                     "status": []
+                  }
+               },
                "depth": 1,
                "customFilter": {
                   "filter": [],
