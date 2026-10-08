@@ -13,6 +13,7 @@ from typing import Optional
 
 from aria.ops.definition.adapter_definition import AdapterDefinition
 from aria.ops.object import Identifier
+from aria.ops.object import Key
 from aria.ops.object import Object
 from aria.ops.result import CollectResult
 from constants_host import HOST_BAND_PROPERTY_LABELS
@@ -103,6 +104,24 @@ def define_object_type(definition: AdapterDefinition) -> None:
         host_risk.define_string_property(band_key, band_label)
 
 
+def _key_args(host_id: str, host_name: str, cluster_name: str):
+    return (
+        ADAPTER_KIND,
+        OBJECT_KIND_HOST_RISK,
+        f"{host_name} - Perf Risk",
+        [
+            Identifier(IDENTIFIER_HOST_VCF_ID, host_id),
+            Identifier(IDENTIFIER_HOST_NAME, host_name, is_part_of_uniqueness=False),
+            Identifier(IDENTIFIER_HOST_CLUSTER_NAME, cluster_name, is_part_of_uniqueness=False),
+        ],
+    )
+
+
+def build_key(host_id: str, host_name: str, cluster_name: str) -> Key:
+    adapter_kind, object_kind, name, identifiers = _key_args(host_id, host_name, cluster_name)
+    return Key(adapter_kind, object_kind, name, identifiers)
+
+
 def build_object(
     result: CollectResult,
     host_id: str,
@@ -114,24 +133,7 @@ def build_object(
         host_metric_values, BAND_BOUNDS, WEIGHTS
     )
 
-    host_obj = result.object(
-        ADAPTER_KIND,
-        OBJECT_KIND_HOST_RISK,
-        f"{host_name} - Perf Risk",
-        identifiers=[
-            Identifier(IDENTIFIER_HOST_VCF_ID, host_id),
-            Identifier(
-                IDENTIFIER_HOST_NAME,
-                host_name,
-                is_part_of_uniqueness=False,
-            ),
-            Identifier(
-                IDENTIFIER_HOST_CLUSTER_NAME,
-                cluster_name,
-                is_part_of_uniqueness=False,
-            ),
-        ],
-    )
+    host_obj = result.object(*_key_args(host_id, host_name, cluster_name))
 
     for metric_key, value in host_metric_values.items():
         if value is not None:
