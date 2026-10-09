@@ -137,3 +137,23 @@ weight tables (shared thresholds from `thresholds_shared.py` merged with
   contention in place of a swap%+compressed% derivation) — see the inline
   comments in `constants_shared.py` and `constants_cluster.py` for the full
   investigation history behind each substitution.
+
+---
+
+## Native-object projection (v1.2.0, optional, default OFF)
+
+Adapter parameter `publish_to_native_objects` (`false`/`true`, advanced).
+When `true`, the values above are also written as **write-only attributes**
+onto the existing VMWARE `ClusterComputeResource` / `HostSystem` objects under
+the root `Performance Risk|<Group>|<Label>` (metrics) and
+`Performance Risk|<Group>|<Label> Band` (string properties), plus
+`Performance Risk|Composite|Risk Score` / `Risk Band`.
+Groups: CPU, Memory, Network, Storage, Contention, Balance, Composite.
+Mapping lives in `app/constants_native.py`.
+
+Guarantees (enforced by `tests/test_native_projection.py`): every key starts
+with `Performance Risk|`; none collides with a native statkey or the
+`vCommunity|` namespace; flag OFF emits no external objects and output is
+identical to 1.1.5; relationships are sent PER_OBJECT so native relationships
+are never rewritten. The own `cluster_perf_risk` / `host_perf_risk` objects are
+unchanged in both modes.

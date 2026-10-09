@@ -28,6 +28,23 @@ def fetch_resources(
     ]
 
 
+def fetch_resource_keys(
+    client: SuiteApiClient, resource_kind: str, adapter_kind: str
+) -> dict[str, dict[str, Any]]:
+    """Returns {resource_id: full Suite API resourceKey dict}. Used to build
+    external (native) Objects with exactly the identity VCF Operations holds."""
+    response = client.paged_post(
+        "/api/resources/query",
+        "resourceList",
+        json={"resourceKind": [resource_kind], "adapterKind": [adapter_kind]},
+    )
+    return {
+        entry["identifier"]: entry["resourceKey"]
+        for entry in response.get("resourceList", [])
+        if "resourceKey" in entry
+    }
+
+
 def latest_stat(client: SuiteApiClient, resource_id: str, statkey: str) -> Optional[float]:
     """
     We only ever request a single statKey per call, so whatever comes back is
