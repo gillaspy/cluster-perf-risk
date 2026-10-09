@@ -1,5 +1,5 @@
 """
-Phase 1 native-object projection. Writes the risk values onto existing VMWARE
+Native-object projection. Writes the risk values onto existing VMWARE
 ClusterComputeResource / HostSystem objects as attributes under
 "Performance Risk|<Group>|<Label>". Never touches a native statkey: the root is
 unique to this pack (see constants_native.py guardrails).
@@ -50,32 +50,30 @@ def native_object(result: CollectResult, resource_key: Optional[dict[str, Any]])
 def project(
     result: CollectResult,
     resource_key: Optional[dict[str, Any]],
-    own_obj: Object,
     metric_values: dict[str, Optional[float]],
+    scored: tuple,
     mapping: dict[str, tuple[str, str]],
-    composite_keys: tuple[str, str],
 ) -> int:
-    """Copy values already computed for own_obj onto the native object. Returns attribute count."""
+    """
+    Write metric_values plus their bands and the composite onto the native
+    object. `scored` is (composite_score, composite_band, {metric_key: band})
+    from cluster.score() / host.score(). Returns the attribute count (0 when
+    the native object could not be identified).
+    """
     target = native_object(result, resource_key)
     if target is None:
         return 0
+    composite_score, composite_band, per_metric_band = scored
     count = 0
     for key, (group, label) in mapping.items():
-        value = metric_values.get(key)
+        if key not in metric_values:
+            continue
+        value = metric_values[key]
         if value is not None:
             target.with_metric(metric_attr(group, label), value)
             count += 1
-        band = own_obj.get_last_property_value(f"band_{key}")
-        if band is not None:
-            target.with_property(band_attr(group, label), band)
-            count += 1
-    score_key, band_key = composite_keys
-    score = own_obj.get_last_metric_value(score_key)
-    if score is not None:
-        target.with_metric(COMPOSITE_SCORE_ATTR, score)
+        target.with_property(band_attr(group, label), per_metric_band.get(key, "unknown"))
         count += 1
-    band = own_obj.get_last_property_value(band_key)
-    if band is not None:
-        target.with_property(COMPOSITE_BAND_ATTR, band)
-        count += 1
-    return count
+    target.with_metric(COMPOSITE_SCORE_ATTR, composite_score)
+    target.with_property(COMPOSITE_BAND_ATTR, composite_band)
+    return count + 2
