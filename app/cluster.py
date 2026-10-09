@@ -1,27 +1,17 @@
 """
-Everything specific to the cluster_perf_risk (vSphere Cluster Performance
-Risk) object type: its adapter definition, its own derived metrics (ballooned
-%, CPU imbalance proxy, network throughput %, vMotion %), and building its
-CollectResult object. Metrics/records shared with the host object come from
+Cluster-scope metrics and scoring: the cluster-only derived metrics (ballooned
+%, CPU imbalance proxy, network throughput %, vMotion %) and the composite
+score. The results are projected onto the native ClusterComputeResource by
+native_projection.py. Metrics shared with the host scope come from
 traversal.py instead.
 """
 import statistics
 from typing import Optional
 
-from aria.ops.definition.adapter_definition import AdapterDefinition
-from aria.ops.object import Identifier
-from aria.ops.object import Object
-from aria.ops.result import CollectResult
 from aria.ops.suite_api_client import SuiteApiClient
-from constants_cluster import BAND_PROPERTY_LABELS
 from constants_cluster import CLUSTER_LEVEL_METRICS
 from constants_cluster import HOST_LINKSPEED_PROPERTY
-from constants_cluster import IDENTIFIER_CLUSTER_NAME
-from constants_cluster import IDENTIFIER_CLUSTER_VCF_ID
 from constants_cluster import METRIC_CLUSTER_CPU_IMBALANCE
-from constants_cluster import METRIC_CLUSTER_CPU_MONSTER_VM_RATIO
-from constants_cluster import METRIC_CLUSTER_MEMORY_MONSTER_VM_RATIO
-from constants_cluster import METRIC_COMPOSITE_SCORE
 from constants_cluster import METRIC_CPU_THREAD_UTILIZATION
 from constants_cluster import METRIC_HOST_CPU_IMBALANCE
 from constants_cluster import METRIC_MEMORY_BALLOONED
@@ -30,23 +20,9 @@ from constants_cluster import METRIC_VMOTION_PCT
 from constants_cluster import NATIVE_STATKEY_MAP
 from constants_cluster import NETWORK_USAGE_AVERAGE_STATKEY
 from constants_cluster import NUMBER_VMOTION_STATKEY
-from constants_cluster import OBJECT_KIND_CLUSTER_RISK
-from constants_cluster import OBJECT_LABEL_CLUSTER_RISK
-from constants_cluster import PROP_COMPOSITE_BAND
 from constants_cluster import VM_COUNT_PER_HOST_STATKEY
-from constants_shared import ADAPTER_KIND
 from constants_shared import MEMORY_BALLOON_KB_STATKEY
 from constants_shared import MEMORY_TOTAL_CAPACITY_KB_STATKEY
-from constants_shared import METRIC_HOST_DROPPED_PACKETS
-from constants_shared import METRIC_HOST_MEMORY_CONTENTION
-from constants_shared import METRIC_P90_DISK_LATENCY
-from constants_shared import METRIC_P90_MEMORY_CONTENTION
-from constants_shared import METRIC_P90_VCPU_COSTOP
-from constants_shared import METRIC_P90_VCPU_READY
-from constants_shared import METRIC_WORST_DISK_LATENCY
-from constants_shared import METRIC_WORST_MEMORY_CONTENTION
-from constants_shared import METRIC_WORST_VCPU_COSTOP
-from constants_shared import METRIC_WORST_VCPU_READY
 import scoring
 import thresholds_cluster
 import thresholds_shared
@@ -58,72 +34,6 @@ from suite_api import latest_stat
 # and the ones it shares with the host object.
 BAND_BOUNDS = {**thresholds_shared.BAND_BOUNDS, **thresholds_cluster.BAND_BOUNDS}
 WEIGHTS = {**thresholds_shared.WEIGHTS, **thresholds_cluster.WEIGHTS}
-
-
-def define_object_type(definition: AdapterDefinition) -> None:
-    cluster_risk = definition.define_object_type(
-        OBJECT_KIND_CLUSTER_RISK, OBJECT_LABEL_CLUSTER_RISK
-    )
-    cluster_risk.define_string_identifier(
-        IDENTIFIER_CLUSTER_VCF_ID, "Cluster VCF Resource ID"
-    )
-    cluster_risk.define_string_identifier(
-        IDENTIFIER_CLUSTER_NAME,
-        "Cluster Name",
-        is_part_of_uniqueness=False,
-    )
-
-    for metric_key in NATIVE_STATKEY_MAP:
-        cluster_risk.define_metric(metric_key, metric_key.replace("_", " ").title(), is_kpi=True)
-    # memory_ballooned_pct, highest_host_cpu_imbalance_pct, and the monster
-    # VM ratios are all derived (no native statkey for any of them), so
-    # they're not in NATIVE_STATKEY_MAP -- define them separately.
-    cluster_risk.define_metric(
-        METRIC_MEMORY_BALLOONED, "Memory Ballooned Pct", is_kpi=True
-    )
-    cluster_risk.define_metric(
-        METRIC_NETWORK_THROUGHPUT, "Network Throughput Pct", is_kpi=True
-    )
-    cluster_risk.define_metric(
-        METRIC_HOST_CPU_IMBALANCE, "Highest ESXi CPU Imbalance Pct", is_kpi=True
-    )
-    cluster_risk.define_metric(
-        METRIC_CLUSTER_CPU_MONSTER_VM_RATIO, "Cluster CPU Monster VM Ratio", is_kpi=True
-    )
-    cluster_risk.define_metric(
-        METRIC_CLUSTER_MEMORY_MONSTER_VM_RATIO, "Cluster Memory Monster VM Ratio", is_kpi=True
-    )
-    cluster_risk.define_metric(
-        METRIC_VMOTION_PCT, "vMotion Pct", is_kpi=True
-    )
-    # Worst/p90 VM-level metrics and the two host-level metrics below are all
-    # derived in traversal.py -- none have a 1:1 native statkey mapping, so
-    # none are in NATIVE_STATKEY_MAP.
-    for metric_key, label in [
-        (METRIC_WORST_VCPU_READY, "Worst vCPU Ready Pct"),
-        (METRIC_P90_VCPU_READY, "P90 vCPU Ready Pct"),
-        (METRIC_WORST_VCPU_COSTOP, "Worst vCPU Co-Stop Pct"),
-        (METRIC_P90_VCPU_COSTOP, "P90 vCPU Co-Stop Pct"),
-        (METRIC_WORST_MEMORY_CONTENTION, "Worst Memory Contention Pct"),
-        (METRIC_P90_MEMORY_CONTENTION, "P90 Memory Contention Pct"),
-        (METRIC_WORST_DISK_LATENCY, "Worst Disk Latency Ms"),
-        (METRIC_P90_DISK_LATENCY, "P90 Disk Latency Ms"),
-        (METRIC_HOST_MEMORY_CONTENTION, "Host Memory Contention Pct"),
-        (METRIC_HOST_DROPPED_PACKETS, "Host Dropped Packets Pct"),
-    ]:
-        cluster_risk.define_metric(metric_key, label, is_kpi=True)
-
-    cluster_risk.define_metric(
-        METRIC_COMPOSITE_SCORE,
-        "Composite Risk Score",
-        is_kpi=True,
-        is_key_attribute=True,
-    )
-    cluster_risk.define_string_property(
-        PROP_COMPOSITE_BAND, "Composite Risk Band", is_key_attribute=True
-    )
-    for band_key, band_label in BAND_PROPERTY_LABELS.items():
-        cluster_risk.define_string_property(band_key, band_label)
 
 
 def gather_metric_values(client: SuiteApiClient, cluster_id: str) -> dict[str, Optional[float]]:
@@ -152,40 +62,9 @@ def gather_metric_values(client: SuiteApiClient, cluster_id: str) -> dict[str, O
     return metric_values
 
 
-def build_object(
-    result: CollectResult,
-    cluster_id: str,
-    cluster_name: str,
-    metric_values: dict[str, Optional[float]],
-) -> Object:
-    composite_score, composite_band, per_metric_band = scoring.compute_composite(
-        metric_values, BAND_BOUNDS, WEIGHTS
-    )
-
-    obj = result.object(
-        ADAPTER_KIND,
-        OBJECT_KIND_CLUSTER_RISK,
-        f"{cluster_name} - Perf Risk",
-        identifiers=[
-            Identifier(IDENTIFIER_CLUSTER_VCF_ID, cluster_id),
-            Identifier(
-                IDENTIFIER_CLUSTER_NAME,
-                cluster_name,
-                is_part_of_uniqueness=False,
-            ),
-        ],
-    )
-
-    for metric_key, value in metric_values.items():
-        if value is not None:
-            obj.with_metric(metric_key, value)
-        band = per_metric_band.get(metric_key, "unknown")
-        obj.with_property(f"band_{metric_key}", band)
-
-    obj.with_metric(METRIC_COMPOSITE_SCORE, composite_score)
-    obj.with_property(PROP_COMPOSITE_BAND, composite_band)
-
-    return obj
+def score(metric_values: dict[str, Optional[float]]) -> tuple:
+    """Returns (composite_score, composite_band, {metric_key: band})."""
+    return scoring.compute_composite(metric_values, BAND_BOUNDS, WEIGHTS)
 
 
 def _highest_host_stat(client: SuiteApiClient, cluster_id: str, statkey: str) -> Optional[float]:

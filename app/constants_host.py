@@ -1,5 +1,5 @@
 """
-Constants specific to the host_perf_risk (ESXi Performance Risk) object type.
+Constants specific to the host scope (ESXi Performance Risk, projected onto HostSystem).
 Metric keys reused as-is from the cluster scope (worst/p90 VM metrics, host
 memory contention/dropped packets) live in constants_shared.py instead.
 
@@ -29,14 +29,6 @@ from constants_shared import METRIC_WORST_MEMORY_CONTENTION
 from constants_shared import METRIC_WORST_VCPU_COSTOP
 from constants_shared import METRIC_WORST_VCPU_READY
 
-OBJECT_KIND_HOST_RISK = "host_perf_risk"
-OBJECT_LABEL_HOST_RISK = "ESXi Performance Risk"
-
-IDENTIFIER_HOST_VCF_ID = "host_vcf_id"
-IDENTIFIER_HOST_NAME = "host_name"
-# Non-unique context identifier linking a host object back to its cluster's
-# display name -- mirrors IDENTIFIER_CLUSTER_NAME's is_part_of_uniqueness=False.
-IDENTIFIER_HOST_CLUSTER_NAME = "cluster_name"
 
 HOST_METRIC_CPU_THREAD_UTILIZATION = "host_cpu_thread_utilization_pct"
 HOST_METRIC_MEMORY_CONSUMED = "host_memory_consumed_pct"
@@ -55,8 +47,6 @@ HOST_METRIC_MONSTER_VM_COUNT = "host_monster_vm_count"
 # whether powered-off hosts should be included -- needs a formula answer,
 # not more statkey digging, same as vMotion % below.
 
-HOST_PROP_COMPOSITE_BAND = "host_composite_risk_band"
-HOST_METRIC_COMPOSITE_SCORE = "host_composite_risk_score"
 
 # Host-object-only statkeys, confirmed live 2026-08-17 (defaultMonitored:
 # True, real data) against ops.vcf.gillaspy.org.

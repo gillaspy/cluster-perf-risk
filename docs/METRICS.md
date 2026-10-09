@@ -1,23 +1,23 @@
 # Cluster Performance Risk — Metrics Reference
 
-Adapter kind: `ClusterPerfRisk`. Two object types are published: **vSphere
-Cluster Performance Risk** (`cluster_perf_risk`) and **ESXi Performance
-Risk** (`host_perf_risk`). Each carries its own set of metrics plus a
-`band_<metric_key>` string property per metric (green/yellow/orange/red/
-unknown) and a composite risk score + band.
+Adapter kind: `ClusterPerfRisk`. **Since 2.0.0 the pack defines no objects of
+its own.** Every value is written as a write-only attribute onto the existing
+VMWARE `ClusterComputeResource` (cluster scope) and `HostSystem` (host scope)
+objects, under the root `Performance Risk|<Group>|<Label>`. The tables below use
+the internal metric keys; [Native attribute names](#native-attribute-names)
+maps each key to its attribute. Each metric also has a `... Band` string
+property (green/yellow/orange/red/unknown), plus a composite risk score and
+band per scope.
 
 All formulas below are transcribed from `app/cluster.py`, `app/host.py`,
 `app/traversal.py`, and `app/scoring.py`.
 
 ---
 
-## Object type: `cluster_perf_risk` — "vSphere Cluster Performance Risk"
+## Cluster scope (ClusterComputeResource)
 
-**Identifiers:** `cluster_vcf_id` ("Cluster VCF Resource ID", unique),
-`cluster_name` ("Cluster Name", not part of uniqueness).
-
-**Relationships:** each host under the cluster is added as a child object
-(`host_perf_risk`).
+The native cluster object is matched by its Suite API `resourceKey`; its
+existing relationships (cluster -> hosts) are native and untouched.
 
 | Metric key | Label | Formula |
 |---|---|---|
@@ -44,17 +44,13 @@ All formulas below are transcribed from `app/cluster.py`, `app/host.py`,
 | `host_dropped_packets_pct` | Host Dropped Packets Pct | MAX across the cluster's hosts of native statkey `net\|droppedPct` |
 | `composite_risk_score` | Composite Risk Score | Weighted-worst-band composite of all metrics above — see [Composite Score Formula](#composite-score-formula) |
 
-The `composite_risk_band` string property (band of the composite score) and
-one `band_<metric_key>` string property per metric above are also published.
+The composite band and one band property per metric above are also published.
 
 ---
 
-## Object type: `host_perf_risk` — "ESXi Performance Risk"
+## Host scope (HostSystem)
 
-**Identifiers:** `host_vcf_id` ("Host VCF Resource ID", unique), `host_name`
-("Host Name", not part of uniqueness), `cluster_name` ("Cluster Name", not
-part of uniqueness — informational only, the graph edge is the parent/child
-relationship from the owning cluster object).
+The native host object is matched by its Suite API `resourceKey`.
 
 | Metric key | Label | Formula |
 |---|---|---|
@@ -78,15 +74,14 @@ relationship from the owning cluster object).
 | `host_dropped_packets_pct` | Dropped Packets Pct | This host's own native statkey `net\|droppedPct` |
 | `host_composite_risk_score` | Composite Risk Score | Weighted-worst-band composite of all metrics above — see [Composite Score Formula](#composite-score-formula) |
 
-The `host_composite_risk_band` string property (band of the composite score)
-and one `band_<metric_key>` string property per metric above (except the
+The composite band and one band property per metric above (except the
 composite score itself) are also published.
 
 Eight metric keys (`worst_vcpu_ready_pct`, `p90_vcpu_ready_pct`,
 `worst_vcpu_costop_pct`, `p90_vcpu_costop_pct`, `worst_memory_contention_pct`,
 `p90_memory_contention_pct`, `worst_disk_latency_ms`, `p90_disk_latency_ms`,
 plus `host_memory_contention_pct`/`host_dropped_packets_pct`) reuse the exact
-same metric key as the cluster object — same key, computed at a different
+same metric key as the cluster scope — same key, computed at a different
 scope (this host's VMs only vs. the whole cluster's VMs).
 
 ---
@@ -95,7 +90,7 @@ scope (this host's VMs only vs. the whole cluster's VMs).
 
 Both `composite_risk_score` (cluster) and `host_composite_risk_score` (host)
 use the same weighted-worst-band algorithm (`app/scoring.py`,
-`compute_composite`), against that object type's own merged band-bounds and
+`compute_composite`), against that scope's own merged band-bounds and
 weight tables (shared thresholds from `thresholds_shared.py` merged with
 `thresholds_cluster.py` or `thresholds_host.py`):
 
@@ -140,20 +135,59 @@ weight tables (shared thresholds from `thresholds_shared.py` merged with
 
 ---
 
-## Native-object projection (v1.2.0, optional, default OFF)
+## Native attribute names
 
-Adapter parameter `publish_to_native_objects` (`false`/`true`, advanced).
-When `true`, the values above are also written as **write-only attributes**
-onto the existing VMWARE `ClusterComputeResource` / `HostSystem` objects under
-the root `Performance Risk|<Group>|<Label>` (metrics) and
-`Performance Risk|<Group>|<Label> Band` (string properties), plus
-`Performance Risk|Composite|Risk Score` / `Risk Band`.
-Groups: CPU, Memory, Network, Storage, Contention, Balance, Composite.
-Mapping lives in `app/constants_native.py`.
+Attributes are written to the native object of the matching scope under
+`Performance Risk|<Group>|<Label>` (metrics) and
+`Performance Risk|<Group>|<Label> Band` (string properties). Mapping lives in
+`app/constants_native.py`.
+
+| Scope | Internal key | Attribute (metric) |
+|---|---|---|
+| Cluster | `worst_vcpu_ready_pct` | `Performance Risk|Contention|Worst vCPU Ready Pct` |
+| Cluster | `p90_vcpu_ready_pct` | `Performance Risk|Contention|P90 vCPU Ready Pct` |
+| Cluster | `worst_vcpu_costop_pct` | `Performance Risk|Contention|Worst vCPU Co-Stop Pct` |
+| Cluster | `p90_vcpu_costop_pct` | `Performance Risk|Contention|P90 vCPU Co-Stop Pct` |
+| Cluster | `worst_memory_contention_pct` | `Performance Risk|Contention|Worst VM Memory Contention Pct` |
+| Cluster | `p90_memory_contention_pct` | `Performance Risk|Contention|P90 VM Memory Contention Pct` |
+| Cluster | `host_memory_contention_pct` | `Performance Risk|Contention|Host Memory Contention Pct` |
+| Cluster | `worst_disk_latency_ms` | `Performance Risk|Storage|Worst Disk Latency Ms` |
+| Cluster | `p90_disk_latency_ms` | `Performance Risk|Storage|P90 Disk Latency Ms` |
+| Cluster | `host_dropped_packets_pct` | `Performance Risk|Network|Host Dropped Packets Pct` |
+| Cluster | `cpu_thread_utilization_pct` | `Performance Risk|CPU|Max Host Thread Utilization Pct` |
+| Cluster | `cluster_cpu_overcommit_ratio` | `Performance Risk|CPU|Overcommit Ratio` |
+| Cluster | `cluster_cpu_monster_vm_ratio` | `Performance Risk|CPU|Monster VM Ratio` |
+| Cluster | `highest_host_cpu_imbalance_pct` | `Performance Risk|Balance|Host CPU Imbalance Pct` |
+| Cluster | `cluster_cpu_imbalance` | `Performance Risk|Balance|DRS CPU Imbalance` |
+| Cluster | `vmotion_pct` | `Performance Risk|Balance|vMotion Pct` |
+| Cluster | `memory_ballooned_pct` | `Performance Risk|Memory|Max Host Ballooned Pct` |
+| Cluster | `cluster_memory_overcommit_ratio` | `Performance Risk|Memory|Overcommit Ratio` |
+| Cluster | `cluster_memory_monster_vm_ratio` | `Performance Risk|Memory|Monster VM Ratio` |
+| Cluster | `network_throughput_pct` | `Performance Risk|Network|Max Host Throughput Pct` |
+| Cluster | `disk_iops` | `Performance Risk|Storage|Max Host Disk IOPS` |
+| Host | `worst_vcpu_ready_pct` | `Performance Risk|Contention|Worst vCPU Ready Pct` |
+| Host | `p90_vcpu_ready_pct` | `Performance Risk|Contention|P90 vCPU Ready Pct` |
+| Host | `worst_vcpu_costop_pct` | `Performance Risk|Contention|Worst vCPU Co-Stop Pct` |
+| Host | `p90_vcpu_costop_pct` | `Performance Risk|Contention|P90 vCPU Co-Stop Pct` |
+| Host | `worst_memory_contention_pct` | `Performance Risk|Contention|Worst VM Memory Contention Pct` |
+| Host | `p90_memory_contention_pct` | `Performance Risk|Contention|P90 VM Memory Contention Pct` |
+| Host | `host_memory_contention_pct` | `Performance Risk|Contention|Host Memory Contention Pct` |
+| Host | `worst_disk_latency_ms` | `Performance Risk|Storage|Worst Disk Latency Ms` |
+| Host | `p90_disk_latency_ms` | `Performance Risk|Storage|P90 Disk Latency Ms` |
+| Host | `host_dropped_packets_pct` | `Performance Risk|Network|Host Dropped Packets Pct` |
+| Host | `host_cpu_thread_utilization_pct` | `Performance Risk|CPU|Thread Utilization Pct` |
+| Host | `host_cpu_reservation_pct` | `Performance Risk|CPU|Reservation Pct` |
+| Host | `host_cpu_overcommit_ratio` | `Performance Risk|CPU|Overcommit Ratio` |
+| Host | `host_monster_vm_count` | `Performance Risk|CPU|Monster VM Count` |
+| Host | `host_memory_consumed_pct` | `Performance Risk|Memory|Consumed Pct` |
+| Host | `host_memory_ballooned_pct` | `Performance Risk|Memory|Ballooned Pct` |
+| Host | `host_memory_reservation_pct` | `Performance Risk|Memory|Reservation Pct` |
+| Host | `host_memory_overcommit_ratio` | `Performance Risk|Memory|Overcommit Ratio` |
+| Cluster, Host | composite score | `Performance Risk|Composite|Risk Score` |
+| Cluster, Host | composite band | `Performance Risk|Composite|Risk Band` (property) |
 
 Guarantees (enforced by `tests/test_native_projection.py`): every key starts
 with `Performance Risk|`; none collides with a native statkey or the
-`vCommunity|` namespace; flag OFF emits no external objects and output is
-identical to 1.1.5; relationships are sent PER_OBJECT so native relationships
-are never rewritten. The own `cluster_perf_risk` / `host_perf_risk` objects are
-unchanged in both modes.
+`vCommunity|` namespace; the pack defines and emits no objects of its own and
+sends no relationships, so native relationships are never rewritten. If a
+native object cannot be matched, it is skipped and logged, never guessed.

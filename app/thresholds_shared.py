@@ -1,6 +1,6 @@
 """
 Band boundaries/weights for metric keys that are reused as-is on both the
-cluster_perf_risk and host_perf_risk object types (see constants_shared.py).
+cluster and host scopes (see constants_shared.py).
 """
 from __future__ import annotations
 
