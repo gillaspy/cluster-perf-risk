@@ -50,12 +50,22 @@
                   "thresholds": {
                     "values": [
                       0,
-                      50,
+                      59.99,
+                      60,
+                      79.99,
+                      80,
+                      89.99,
+                      90,
                       100
                     ],
                     "colors": [
                       "#74B43B",
+                      "#74B43B",
                       "#ECC33E",
+                      "#ECC33E",
+                      "#F28B30",
+                      "#F28B30",
+                      "#DE3F30",
                       "#DE3F30"
                     ]
                   }
@@ -97,13 +107,22 @@
                   "thresholds": {
                     "values": [
                       0,
-                      50,
+                      59.99,
+                      60,
+                      79.99,
+                      80,
+                      89.99,
+                      90,
                       100
                     ],
                     "colors": [
                       "#74B43B",
                       "#74B43B",
                       "#ECC33E",
+                      "#ECC33E",
+                      "#F28B30",
+                      "#F28B30",
+                      "#DE3F30",
                       "#DE3F30"
                     ]
                   }
@@ -560,7 +579,7 @@
       "homeTab": false,
       "rank": 0,
       "disabled": false,
-      "id": "fee051b0-8132-4305-a206-2fc82aed38a4",
+      "id": "53020797-924b-4269-9d38-33b786a0d982",
       "adapterName": "iSDK_ClusterPerfRisk",
       "locked": false,
       "dashboardNavigations": {},
@@ -594,5 +613,5 @@
       "lastUpdateTime": 1787844769342
     }
   ],
-  "uuid": "609d8b3d-b37e-4a4b-beb0-406eaa1896a9"
+  "uuid": "f037f5df-2cae-47fe-94be-40cb8bd2a540"
 }

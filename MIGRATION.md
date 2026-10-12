@@ -8,9 +8,9 @@ under `Performance Risk|<Group>|<Label>` (see `docs/METRICS.md`).
 ## What breaks
 Anything you built on the old objects or their metric keys stops receiving
 data: custom dashboards, views, reports, super metrics, alerts, groups. The
-shipped dashboard is replaced (same dashboard ID and name) by one built on the
-native objects. Rebuild your own content on `ClusterComputeResource` /
-`HostSystem` and the `Performance Risk|...` attributes.
+shipped dashboard "Cluster Performance Risk" is replaced by a new one of the
+same name built on the native objects. Rebuild your own content on
+`ClusterComputeResource` / `HostSystem` and the `Performance Risk|...` attributes.
 
 ## Uninstall 1.x first
 2.0.0 cannot be installed over 1.x. VCF Operations refuses an upgrade that
@@ -30,14 +30,21 @@ the Monster VM Threshold.
    account's settings (name, collector, Monster VM Threshold).
 2. Uninstall 1.x: Administration > Integrations > Repository, the pack's
    ⋮ menu > Uninstall.
-3. Install the 2.0.0 pak from the same page.
-4. Recreate the adapter account under Integrations > Accounts.
-5. After the next collection, confirm `Performance Risk` appears under a
+3. Delete the 1.x dashboards that uninstalling leaves behind: "Cluster
+   Performance Risk" and, if you installed 1.3.0, "Cluster Performance Risk
+   (Native)" (Dashboards > Manage). The old "Cluster Performance Risk" points
+   at the removed object types and shows unconfigured widgets; if it is still
+   there, it can hide the new dashboard of the same name.
+4. Install the 2.0.0 pak from the same page.
+5. Recreate the adapter account under Integrations > Accounts.
+6. After the next collection, confirm `Performance Risk` appears under a
    cluster's and a host's metrics and properties.
-6. Check Environment > Inventory for leftover "vSphere Cluster Performance
+7. Check Environment > Inventory for leftover "vSphere Cluster Performance
    Risk" / "ESXi Performance Risk" objects and delete any that remain.
-7. Check the dashboard "Cluster Performance Risk". If an old copy is still
-   listed beside the new one, delete the old one.
+8. Open "Cluster Performance Risk" and click a cluster in the Heatmap. If its
+   widgets say they are not configured, it is the old copy: delete it, then
+   reinstall the 2.0.0 pak with "Install the PAK file even if it is already
+   installed" and "Reset Default Content" ticked.
 
 ## Rolling back
 Uninstall 2.0.0, install the 1.3.0 pak and recreate the adapter account.
