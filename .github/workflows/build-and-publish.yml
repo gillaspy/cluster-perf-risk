@@ -293,6 +293,11 @@ jobs:
           shopt -s nullglob
           paks=(build/*.pak)
           [ "${#paks[@]}" -eq 1 ] || { echo "::error::expected one pak in build/, found ${#paks[@]}"; exit 1; }
+          # mp-build names it <AdapterKind>_<version>.pak; publish it under the
+          # repo's name. Renamed before anything is signed, attested or hashed.
+          pak="build/cluster-perf-risk-${VERSION}.pak"
+          mv -- "${paks[0]}" "$pak"
+          paks=("$pak")
           digest="$(python3 - "${paks[0]}" "$IMAGE" "$VERSION" <<'EOF'
           import io, json, re, sys, zipfile
           pak, image, version = sys.argv[1:]
@@ -418,7 +423,7 @@ jobs:
 
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
-          name: pak
+          name: cluster-perf-risk
           path: |
             ${{ env.PROJECT_DIR }}/build/*.pak
             ${{ env.PROJECT_DIR }}/build/*.pak.sigstore.json
@@ -434,7 +439,7 @@ jobs:
     steps:
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
-          name: pak
+          name: cluster-perf-risk
           path: dist
 
       - name: Create or update the GitHub Release
