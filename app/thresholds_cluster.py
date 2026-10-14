@@ -1,5 +1,5 @@
 """
-Band boundaries/weights for cluster_perf_risk-only metric keys, transcribed
+Band boundaries/weights for cluster-scope-only metric keys, transcribed
 from the vSphere Cluster Performance Risk matrix. Metric keys shared with the
 host object live in thresholds_shared.py instead.
 """

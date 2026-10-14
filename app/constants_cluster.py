@@ -1,5 +1,5 @@
 """
-Constants specific to the cluster_perf_risk object type. Metric keys reused
+Constants specific to the cluster scope (projected onto ClusterComputeResource). Metric keys reused
 as-is on the host object too (worst/p90 VM metrics, host memory
 contention/dropped packets) live in constants_shared.py instead.
 """
@@ -15,11 +15,7 @@ from constants_shared import METRIC_WORST_MEMORY_CONTENTION
 from constants_shared import METRIC_WORST_VCPU_COSTOP
 from constants_shared import METRIC_WORST_VCPU_READY
 
-OBJECT_KIND_CLUSTER_RISK = "cluster_perf_risk"
-OBJECT_LABEL_CLUSTER_RISK = "vSphere Cluster Performance Risk"
 
-IDENTIFIER_CLUSTER_VCF_ID = "cluster_vcf_id"
-IDENTIFIER_CLUSTER_NAME = "cluster_name"
 
 # Metric keys. NOTE: the matrix's two separate imbalance rows ("Highest ESXi
 # CPU Imbalance" and "Cluster CPU Imbalance") are tracked as two distinct
@@ -46,7 +42,6 @@ METRIC_CLUSTER_MEMORY_OVERCOMMIT_RATIO = "cluster_memory_overcommit_ratio"
 METRIC_CLUSTER_CPU_MONSTER_VM_RATIO = "cluster_cpu_monster_vm_ratio"
 METRIC_CLUSTER_MEMORY_MONSTER_VM_RATIO = "cluster_memory_monster_vm_ratio"
 
-METRIC_COMPOSITE_SCORE = "composite_risk_score"
 
 # Sub-metrics that are already cluster-level (no per-host "highest" rollup needed)
 CLUSTER_LEVEL_METRICS = {
@@ -55,7 +50,6 @@ CLUSTER_LEVEL_METRICS = {
     METRIC_CLUSTER_MEMORY_OVERCOMMIT_RATIO,
 }
 
-PROP_COMPOSITE_BAND = "composite_risk_band"
 
 BAND_PROPERTY_LABELS = {
     f"band_{METRIC_CPU_THREAD_UTILIZATION}": "CPU Thread Utilization Band",

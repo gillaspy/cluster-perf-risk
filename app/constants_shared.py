@@ -1,5 +1,5 @@
 """
-Constants used by both the cluster_perf_risk and host_perf_risk object types
+Constants used by both the cluster and host scopes
 (and by the shared cluster->host->VM traversal in traversal.py). Anything that
 belongs to only one object type lives in constants_cluster.py / constants_host.py
 instead.

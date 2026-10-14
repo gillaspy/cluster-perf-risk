@@ -1,5 +1,5 @@
 """
-Band boundaries/weights for host_perf_risk-only metric keys. Metric keys
+Band boundaries/weights for host-scope-only metric keys. Metric keys
 shared with the cluster object live in thresholds_shared.py instead.
 """
 from __future__ import annotations
@@ -14,7 +14,7 @@ from constants_host import HOST_METRIC_MEMORY_RESERVATION
 from constants_host import HOST_METRIC_MONSTER_VM_COUNT
 
 # Each entry: green_max, yellow_max, orange_max. Anything above orange_max is red.
-# 2026-08-17 net-new, alongside the host_perf_risk object type.
+# 2026-08-17 net-new, alongside the host scope.
 BAND_BOUNDS = {
     HOST_METRIC_CPU_THREAD_UTILIZATION: {"green_max": 60, "yellow_max": 80, "orange_max": 90},
     HOST_METRIC_MEMORY_CONSUMED: {"green_max": 80, "yellow_max": 90, "orange_max": 95},
