@@ -30,7 +30,7 @@ keys or secrets to manage), attests both with GitHub build provenance, tags
 the image `1.3.1`, and creates a GitHub Release with the pak, its signature
 bundle (`.pak.sigstore.json`) and `SHA256SUMS`. A `v1.3.1-rc.1` tag publishes
 a prerelease and may come from any branch. Its pak carries version `1.3.1`
-(`ClusterPerfRisk_1.3.1.pak`); the Release is named `v1.3.1-rc.1` and the image is
+(`cluster-perf-risk-1.3.1.pak`; a hand-run `mp-build` still writes `ClusterPerfRisk_<version>.pak`); the Release is named `v1.3.1-rc.1` and the image is
 tagged `1.3.1-rc.1`.
 A version that already exists in GHCR is refused; release a new patch version
 instead. `config.json` still points local `mp-build` runs at Docker Hub; the
@@ -56,7 +56,7 @@ vulnerability check. Verify that digest yourself:
 1. Read what the pak points at (`REGISTRY`, `REPOSITORY`, `DIGEST`):
 
    ```
-   unzip -p ClusterPerfRisk_1.3.0.pak adapter.zip > adapter.zip
+   unzip -p cluster-perf-risk-1.3.0.pak adapter.zip > adapter.zip
    unzip -p adapter.zip ClusterPerfRisk.conf
    ```
 
@@ -67,10 +67,10 @@ vulnerability check. Verify that digest yourself:
    ID='^https://github\.com/gillaspy/cluster-perf-risk/\.github/workflows/build-and-publish\.yml@refs/tags/v'
    ISSUER=https://token.actions.githubusercontent.com
    cosign verify "$IMAGE" --certificate-identity-regexp "$ID" --certificate-oidc-issuer "$ISSUER"
-   cosign verify-blob ClusterPerfRisk_1.3.0.pak --bundle ClusterPerfRisk_1.3.0.pak.sigstore.json \
+   cosign verify-blob cluster-perf-risk-1.3.0.pak --bundle cluster-perf-risk-1.3.0.pak.sigstore.json \
      --certificate-identity-regexp "$ID" --certificate-oidc-issuer "$ISSUER"
    gh attestation verify "oci://$IMAGE" --repo gillaspy/cluster-perf-risk
-   gh attestation verify ClusterPerfRisk_1.3.0.pak --repo gillaspy/cluster-perf-risk
+   gh attestation verify cluster-perf-risk-1.3.0.pak --repo gillaspy/cluster-perf-risk
    trivy image --severity HIGH,CRITICAL --ignore-unfixed "$IMAGE"
    ```
 
@@ -85,12 +85,12 @@ vulnerability check. Verify that digest yourself:
    MIRROR=registry.example.internal/mirror/cluster-perf-risk
    crane copy "$IMAGE" "$MIRROR:1.3.0"
    crane digest "$MIRROR:1.3.0"        # must equal DIGEST from step 1
-   cp ClusterPerfRisk_1.3.0.pak ClusterPerfRisk_1.3.0-mirror.pak
-   unzip -o -q ClusterPerfRisk_1.3.0-mirror.pak adapter.zip
+   cp cluster-perf-risk-1.3.0.pak cluster-perf-risk-1.3.0-mirror.pak
+   unzip -o -q cluster-perf-risk-1.3.0-mirror.pak adapter.zip
    unzip -o -q adapter.zip ClusterPerfRisk.conf
    sed -i -e 's|^REGISTRY=.*|REGISTRY=registry.example.internal|' \
           -e 's|^REPOSITORY=.*|REPOSITORY=/mirror/cluster-perf-risk|' ClusterPerfRisk.conf
-   zip -q adapter.zip ClusterPerfRisk.conf && zip -q ClusterPerfRisk_1.3.0-mirror.pak adapter.zip
+   zip -q adapter.zip ClusterPerfRisk.conf && zip -q cluster-perf-risk-1.3.0-mirror.pak adapter.zip
    trivy image --severity HIGH,CRITICAL --ignore-unfixed "$MIRROR@sha256:<DIGEST>"
    ```
 
