@@ -1,11 +1,40 @@
 Cluster Performance Risk — a VCF Operations management pack that adds composite performance-risk scoring to the native vSphere cluster and host objects.
 
-Since 2.0.0 the pack defines no objects of its own: it writes `Performance Risk|<Group>|<Label>` attributes onto the existing `ClusterComputeResource` and `HostSystem` objects. See `docs/METRICS.md` for metrics and formulas, and `MIGRATION.md` when upgrading from 1.x.
+Since 2.0.0 the pack defines no objects of its own: it writes `Performance Risk|<Group>|<Label>` attributes onto the existing `ClusterComputeResource` and `HostSystem` objects. See [Where to find the metrics](#where-to-find-the-metrics) and [docs/METRICS.md](docs/METRICS.md) for metrics and formulas, and [MIGRATION.md](MIGRATION.md) when upgrading from 1.x.
+
+## Where to find the metrics
+
+The pack writes its values onto the native vSphere objects, so they don't appear
+in the pack's own metric list on the Repository page. Find them here:
+
+- **On an object:** open a cluster or host, then Metrics (or Properties) >
+  **Performance Risk**.
+- **In dashboards, views, super metrics and alerts:** pick Cluster Compute
+  Resource or Host System, then the `Performance Risk` group. They are listed
+  once the first collection has written them.
+- **Shipped dashboard:** "Cluster Performance Risk".
+
+Each metric below is a `Performance Risk|<Group>|<Label>` metric with a matching
+`Performance Risk|<Group>|<Label> Band` property (green, yellow, orange, red,
+or unknown when there is no data).
+Both objects also get `Performance Risk|Composite|Risk Score` (0-100) and
+`Performance Risk|Composite|Risk Band`.
+
+| Group | Cluster (`ClusterComputeResource`) | Host (`HostSystem`) |
+|---|---|---|
+| CPU | Max Host Thread Utilization Pct, Overcommit Ratio, Monster VM Ratio | Thread Utilization Pct, Reservation Pct, Overcommit Ratio, Monster VM Count |
+| Memory | Max Host Ballooned Pct, Overcommit Ratio, Monster VM Ratio | Consumed Pct, Ballooned Pct, Reservation Pct, Overcommit Ratio |
+| Storage | Worst Disk Latency Ms, P90 Disk Latency Ms, Max Host Disk IOPS | Worst Disk Latency Ms, P90 Disk Latency Ms |
+| Network | Host Dropped Packets Pct, Max Host Throughput Pct | Host Dropped Packets Pct |
+| Contention | Worst / P90 vCPU Ready Pct, Worst / P90 vCPU Co-Stop Pct, Worst / P90 VM Memory Contention Pct, Host Memory Contention Pct | Same as cluster, from this host's own VMs |
+| Balance | Host CPU Imbalance Pct, DRS CPU Imbalance, vMotion Pct | — |
+
+Formulas, thresholds and the composite score are in
+[docs/METRICS.md](docs/METRICS.md).
 
 ## License
 
 Copyright 2026 Tom Gillaspy. Licensed under the [Apache License, Version 2.0](LICENSE); see `NOTICE`.
-This is a VCF Ops Management Pack to add metrics for enhancing cluster capacity monitoring.
 
 ## Build and release
 
