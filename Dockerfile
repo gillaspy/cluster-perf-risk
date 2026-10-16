@@ -7,6 +7,7 @@ RUN pip3 install -r adapter_requirements.txt --upgrade
 # exactly (4 fixed HIGH CVEs). Nothing of ours imports cryptography; the SDK
 # library only uses cryptography.x509 (certificate_info.py) for the stable,
 # long-standing x509 parsing API, so overriding the pin to the latest release
-# is safe. Revisit if a future SDK library release pins a different version.
-RUN pip3 install -U cryptography
+# is safe. The version is pinned to the one that was tested; bump it
+# deliberately (tests + scan), and revisit if the SDK library re-pins.
+RUN pip3 install "cryptography==50.0.2"
 COPY app app
