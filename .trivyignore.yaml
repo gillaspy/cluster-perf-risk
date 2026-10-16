@@ -2,40 +2,37 @@
 # fails on any other HIGH or CRITICAL finding that has a fix available.
 # Each entry is scoped to the exact package version, so it stops matching
 # once that version is gone, and expires so it gets looked at again.
+#
+# cryptography 44.0.0 (4 HIGH CVEs, pinned exactly by
+# vmware-aria-operations-integration-sdk-lib 1.1.0) is no longer on this list:
+# the Dockerfile now overrides the pin with `pip3 install -U cryptography`
+# after the SDK install, verified against the SDK library's one use of it
+# (aria.ops.certificate_info, cryptography.x509) and the adapter's unit tests.
 vulnerabilities:
-  # cryptography 44.0.0 is pinned exactly by vmware-aria-operations-integration-sdk-lib
-  # 1.1.0 (install_requires "cryptography == 44.0.0"), the newest SDK library.
-  - id: CVE-2026-26007
-    purls: ["pkg:pypi/cryptography@44.0.0"]
-    statement: Pinned by the SDK library; clears when the SDK library releases a newer pin.
-    expired_at: 2027-01-11
-  - id: CVE-2026-69247
-    purls: ["pkg:pypi/cryptography@44.0.0"]
-    statement: Pinned by the SDK library; clears when the SDK library releases a newer pin.
-    expired_at: 2027-01-11
-  - id: CVE-2026-69249
-    purls: ["pkg:pypi/cryptography@44.0.0"]
-    statement: Pinned by the SDK library; clears when the SDK library releases a newer pin.
-    expired_at: 2027-01-11
-  - id: GHSA-537c-gmf6-5ccf
-    purls: ["pkg:pypi/cryptography@44.0.0"]
-    statement: Pinned by the SDK library; clears when the SDK library releases a newer pin.
-    expired_at: 2027-01-11
-  # Copies vendored inside pip (pip/_vendor) in the SDK base image. The
-  # adapter does not import them; they clear when pip ships updated copies.
+  # pip (in the SDK base image) carries its own copies of these two packages
+  # under pip/_vendor for pip's internal use; they are pip's, not something
+  # the adapter installs or imports, and the live top-level install the
+  # adapter actually imports from is already current (urllib3 2.8.0). They
+  # clear when pip ships updated vendored copies.
   - id: GHSA-6v7p-g79w-8964
     purls: ["pkg:pypi/msgpack@1.1.2"]
-    statement: Vendored inside pip in the SDK base image, not used by the adapter.
-    expired_at: 2027-01-11
-  - id: CVE-2025-47273
-    purls: ["pkg:pypi/setuptools@70.3.0"]
-    statement: Vendored inside pip in the SDK base image, not used by the adapter.
+    statement: pip's own vendored copy (pip/_vendor/msgpack); not installed or imported by the adapter.
     expired_at: 2027-01-11
   - id: CVE-2026-97687
     purls: ["pkg:pypi/urllib3@2.7.0"]
-    statement: Vendored inside pip in the SDK base image, not used by the adapter.
+    statement: pip's own vendored copy (pip/_vendor/urllib3); the adapter's live urllib3 (2.8.0) is unaffected.
     expired_at: 2027-01-11
   - id: CVE-2026-97689
     purls: ["pkg:pypi/urllib3@2.7.0"]
-    statement: Vendored inside pip in the SDK base image, not used by the adapter.
+    statement: pip's own vendored copy (pip/_vendor/urllib3); the adapter's live urllib3 (2.8.0) is unaffected.
+    expired_at: 2027-01-11
+  # setuptools 70.3.0 is not vendored code: it only appears as metadata in
+  # pip's own build-time SBOM and version pin list
+  # (pip/_vendor/bom.cdx.json, pip/_vendor/vendor.txt). There is no
+  # pip/_vendor/setuptools directory, and the live setuptools the adapter's
+  # Python installation actually uses is already current (84.0.0). Clears
+  # when pip ships an updated vendor.txt/bom.cdx.json.
+  - id: CVE-2025-47273
+    purls: ["pkg:pypi/setuptools@70.3.0"]
+    statement: Metadata-only entry in pip's own vendor.txt/bom.cdx.json, not an installed package or import.
     expired_at: 2027-01-11

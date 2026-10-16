@@ -55,9 +55,10 @@ last released version, which is what a hand-run `mp-build` uses.
 
 The workflow runs `mp-build` against `ghcr.io/gillaspy/cluster-perf-risk`,
 scans the pushed image, signs the image and the pak with cosign (keyless: no
-keys or secrets to manage), attests both with GitHub build provenance, tags
-the image `1.3.1`, and creates a GitHub Release with the pak, its signature
-bundle (`.pak.sigstore.json`) and `SHA256SUMS`. A `v1.3.1-rc.1` tag publishes
+keys or secrets to manage), attests both with GitHub build provenance, attests
+an SBOM for the image, tags the image `1.3.1`, and creates a GitHub Release
+with the pak, its signature bundle (`.pak.sigstore.json`) and `SHA256SUMS`.
+A `v1.3.1-rc.1` tag publishes
 a prerelease and may come from any branch. Its pak carries version `1.3.1`
 (`cluster-perf-risk-1.3.1.pak`; a hand-run `mp-build` still writes `ClusterPerfRisk_<version>.pak`); the Release is named `v1.3.1-rc.1` and the image is
 tagged `1.3.1-rc.1`.
@@ -71,9 +72,11 @@ Change visibility) and re-run the failed jobs. If the package already exists
 because it was pushed by hand, give this repository Write under the package's
 Manage Actions access.
 
-`.trivyignore.yaml` lists the scan findings this repository cannot fix
-(`cryptography` pinned by the SDK library, copies vendored inside pip). Each
-entry expires, and the scan fails again until it is reviewed.
+`.trivyignore.yaml` lists the scan findings this repository cannot fix: pip's
+own vendored copies of `urllib3` and `msgpack`, and `setuptools` as it appears
+in pip's own build-time SBOM, none of which the adapter installs or imports.
+Each entry expires, and the scan fails again until it is reviewed. See
+[SECURITY.md](SECURITY.md) for how the image is signed and scanned.
 
 ### Verifying what you install
 

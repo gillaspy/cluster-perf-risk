@@ -181,7 +181,6 @@ def collect(adapter_instance: AdapterInstance) -> CollectResult:
             logger.exception(e)
             result.with_error(f"Unexpected collection error: {e!r}")
 
-        logger.debug(f"Returning collection result {result.get_json()}")
         return result
 
 
