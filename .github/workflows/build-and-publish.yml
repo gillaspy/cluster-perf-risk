@@ -370,6 +370,29 @@ jobs:
           subject-digest: ${{ steps.pak.outputs.digest }}
           push-to-registry: true
 
+      # mp-build pushes the image with the classic Docker Engine build API, which
+      # has no buildx/BuildKit attestation support, so there is no single build
+      # step to hand `sbom: true` / `provenance: mode=max` to. These two steps get
+      # Docker Scout's attestation policy (provenance + SBOM present on the
+      # digest) the same place every other attestation here lands: as a separate
+      # attestation on the already-pushed, already-verified-pullable digest.
+      - name: Generate an SBOM for the published image
+        uses: anchore/sbom-action@66cbf4bc1f1c0d2edc94016e65bc221b6bb0ad6c # v0.24.3
+        with:
+          image: ${{ steps.pak.outputs.image_ref }}
+          format: spdx-json
+          output-file: image.sbom.spdx.json
+          upload-artifact: false
+          upload-release-assets: false
+
+      - name: Attest SBOM on the image digest
+        uses: actions/attest-sbom@c604332985a26aa8cf1bdc465b92731239ec6b9e # v4.1.0
+        with:
+          subject-name: ${{ steps.tag.outputs.image }}
+          subject-digest: ${{ steps.pak.outputs.digest }}
+          sbom-path: image.sbom.spdx.json
+          push-to-registry: true
+
       - name: Attest build provenance on the pak
         uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
         with:
