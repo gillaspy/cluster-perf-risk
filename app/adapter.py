@@ -40,6 +40,7 @@ from suite_api import apply_request_timeout
 from suite_api import fetch_resource_keys
 from suite_api import fetch_resources
 from suite_api import session
+from suite_api import SuiteApiError
 from traversal import collect_cluster_and_host_metrics
 
 logger = logging.getLogger(__name__)
@@ -118,6 +119,14 @@ def collect(adapter_instance: AdapterInstance) -> CollectResult:
         apply_request_timeout(client)
         try:
             with session(client):
+                if not client.token:
+                    # The SDK only logs a warning when the token request is
+                    # refused; every later call would then get a 401.
+                    result.with_error(
+                        "Could not get a Suite API token from VCF Operations "
+                        f"({client.credential.host}). See adapter.log."
+                    )
+                    return result
                 started = time.monotonic()
                 clusters = fetch_resources(client, RESOURCE_KIND_CLUSTER, VMWARE_ADAPTER_KIND)
                 cluster_keys = fetch_resource_keys(client, RESOURCE_KIND_CLUSTER, VMWARE_ADAPTER_KIND)
@@ -127,6 +136,13 @@ def collect(adapter_instance: AdapterInstance) -> CollectResult:
                 total_hosts = 0
                 hosts_projected = 0
                 attributes = 0
+                failed: list[str] = []
+                last_error = None
+                if not clusters:
+                    logger.warning(
+                        f"VCF Operations returned no {VMWARE_ADAPTER_KIND} "
+                        f"{RESOURCE_KIND_CLUSTER} objects; nothing to score"
+                    )
                 for cluster_id, cluster_name in clusters:
                     # One cluster failing must never lose the others.
                     try:
@@ -170,6 +186,20 @@ def collect(adapter_instance: AdapterInstance) -> CollectResult:
                     except Exception as e:  # noqa: BLE001
                         logger.error(f"Collection failed for cluster {cluster_name!r} ({cluster_id})")
                         logger.exception(e)
+                        failed.append(cluster_name)
+                        last_error = e
+
+                if clusters and len(failed) == len(clusters):
+                    result.with_error(
+                        f"Collection failed for all {len(clusters)} clusters, "
+                        f"last error: {last_error!r}. See adapter.log."
+                    )
+                    return result
+                if failed:
+                    logger.warning(
+                        f"Collection failed for {len(failed)} of {len(clusters)} clusters: "
+                        f"{', '.join(repr(n) for n in failed)}"
+                    )
 
                 logger.info(
                     f"Collected {len(clusters)} clusters ({clusters_with_hosts} with host data), "
@@ -180,6 +210,9 @@ def collect(adapter_instance: AdapterInstance) -> CollectResult:
                     f"{hosts_projected}/{total_hosts} hosts, {attributes} attributes"
                 )
 
+        except SuiteApiError as e:
+            logger.exception(e)
+            result.with_error(f"Suite API call failed: {e}. See adapter.log.")
         except Exception as e:
             logger.error("Unexpected collection error")
             logger.exception(e)

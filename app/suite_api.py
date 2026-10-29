@@ -5,6 +5,11 @@ Used by traversal.py and by cluster.py's cluster-only derived metrics.
 NOTE: SuiteApiClient.query_for_resources() (a convenience method) discards
 the internal resource UUID needed for subsequent stats/relationship calls,
 so these helpers call the Suite API directly instead.
+
+Failures raise SuiteApiError instead of returning an empty answer: the SDK's
+paged_post() returns an empty list on a 401/403/5xx, which made a failed
+login or query look like an environment with no clusters. A 404 for one
+resource (deleted since the query) still reads as "no data".
 """
 from contextlib import contextmanager
 from typing import Any
@@ -60,18 +65,54 @@ def session(client: SuiteApiClient) -> Iterator[SuiteApiClient]:
             logger.warning(f"Could not release the Suite API token: {e!r}")
 
 
+class SuiteApiError(Exception):
+    """A Suite API call answered with an error status."""
+
+    def __init__(self, method: str, url: str, status: int):
+        hint = ""
+        if status in (401, 403):
+            hint = " (check that the Suite API account can read VMWARE objects)"
+        super().__init__(f"{method} {url} returned HTTP {status}{hint}")
+        self.status = status
+
+
+def _check(response: Any, method: str, url: str) -> None:
+    if not response.ok:
+        raise SuiteApiError(method, url, response.status_code)
+
+
+PAGE_SIZE = 1000
+
+
+def _query_resources(client: SuiteApiClient, resource_kind: str, adapter_kind: str) -> list[dict[str, Any]]:
+    """Every page of POST /api/resources/query. Pages itself rather than use
+    paged_post(), which returns an empty list when the query fails."""
+    url = "/api/resources/query"
+    entries: list[dict[str, Any]] = []
+    page = 0
+    while True:
+        with client.post(
+            url,
+            params={"page": page, "pageSize": PAGE_SIZE},
+            json={"resourceKind": [resource_kind], "adapterKind": [adapter_kind]},
+        ) as response:
+            _check(response, "POST", url)
+            body: dict[str, Any] = response.json()
+        batch = body.get("resourceList", [])
+        entries.extend(batch)
+        total = int(body.get("pageInfo", {}).get("totalCount", len(entries)))
+        page += 1
+        if not batch or len(entries) >= total:
+            return entries
+
+
 def fetch_resources(
     client: SuiteApiClient, resource_kind: str, adapter_kind: str
 ) -> list[tuple[str, str]]:
     """Returns a list of (resource_id, resource_name) tuples."""
-    response = client.paged_post(
-        "/api/resources/query",
-        "resourceList",
-        json={"resourceKind": [resource_kind], "adapterKind": [adapter_kind]},
-    )
     return [
         (entry["identifier"], entry["resourceKey"]["name"])
-        for entry in response.get("resourceList", [])
+        for entry in _query_resources(client, resource_kind, adapter_kind)
     ]
 
 
@@ -80,14 +121,9 @@ def fetch_resource_keys(
 ) -> dict[str, dict[str, Any]]:
     """Returns {resource_id: full Suite API resourceKey dict}. Used to build
     external (native) Objects with exactly the identity VCF Operations holds."""
-    response = client.paged_post(
-        "/api/resources/query",
-        "resourceList",
-        json={"resourceKind": [resource_kind], "adapterKind": [adapter_kind]},
-    )
     return {
         entry["identifier"]: entry["resourceKey"]
-        for entry in response.get("resourceList", [])
+        for entry in _query_resources(client, resource_kind, adapter_kind)
         if "resourceKey" in entry
     }
 
@@ -101,12 +137,11 @@ def latest_stat(client: SuiteApiClient, resource_id: str, statkey: str) -> Optio
     disk|commandsAveraged_average). Matching the returned key exactly against
     the requested key silently dropped those aggregated values.
     """
-    with client.get(
-        f"/api/resources/{resource_id}/stats/latest",
-        params={"statKey": [statkey]},
-    ) as response:
-        if not response.ok:
+    url = f"/api/resources/{resource_id}/stats/latest"
+    with client.get(url, params={"statKey": [statkey]}) as response:
+        if response.status_code == 404:
             return None
+        _check(response, "GET", url)
         body: dict[str, Any] = response.json()
         for entry in body.get("values", []):
             for stat in entry.get("stat-list", {}).get("stat", []):
@@ -123,9 +158,11 @@ def get_property(client: SuiteApiClient, resource_id: str, property_name: str) -
     /stats/latest. Values come back as strings regardless of underlying type
     (e.g. "10000.0" for a numeric linkspeed), so callers must cast.
     """
-    with client.get(f"/api/resources/{resource_id}/properties") as response:
-        if not response.ok:
+    url = f"/api/resources/{resource_id}/properties"
+    with client.get(url) as response:
+        if response.status_code == 404:
             return None
+        _check(response, "GET", url)
         body: dict[str, Any] = response.json()
         for prop in body.get("property", []):
             if prop.get("name") == property_name:
@@ -137,12 +174,11 @@ def fetch_children_of_kind(
     client: SuiteApiClient, resource_id: str, resource_kind: str
 ) -> list[tuple[str, str]]:
     """Returns (resource_id, resource_name) tuples of resource_id's direct children of the given kind."""
-    with client.get(
-        f"/api/resources/{resource_id}/relationships",
-        params={"relationshipType": "CHILD"},
-    ) as response:
-        if not response.ok:
+    url = f"/api/resources/{resource_id}/relationships"
+    with client.get(url, params={"relationshipType": "CHILD"}) as response:
+        if response.status_code == 404:
             return []
+        _check(response, "GET", url)
         body = response.json()
         return [
             (entry["identifier"], entry["resourceKey"]["name"])
