@@ -18,6 +18,10 @@ vulnerabilities:
     purls: ["pkg:pypi/msgpack@1.1.2"]
     statement: pip's own vendored copy (pip/_vendor/msgpack); not installed or imported by the adapter.
     expired_at: 2027-01-11
+  - id: CVE-2026-114613
+    purls: ["pkg:pypi/msgpack@1.1.2"]
+    statement: pip's own vendored copy (pip/_vendor/msgpack); not installed or imported by the adapter.
+    expired_at: 2027-01-11
   - id: CVE-2026-97687
     purls: ["pkg:pypi/urllib3@2.7.0"]
     statement: pip's own vendored copy (pip/_vendor/urllib3); the adapter's live urllib3 (2.8.0) is unaffected.
