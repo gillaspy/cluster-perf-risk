@@ -1,6 +1,6 @@
 """
 Generic Suite API wrappers -- no object-type awareness, no risk-scoring logic.
-Used by traversal.py and by cluster.py's cluster-only derived metrics.
+Used by traversal.py, which reads each cluster's data in bulk.
 
 NOTE: SuiteApiClient.query_for_resources() (a convenience method) discards
 the internal resource UUID needed for subsequent stats/relationship calls,
@@ -27,6 +27,14 @@ logger = logging.getLogger(__name__)
 # Page size for /api/resources/query. Same as the SDK's own paged_post default.
 RESOURCE_QUERY_PAGE_SIZE = 1000
 
+# Most resource IDs sent in one stats/properties latest/query request. Larger
+# sets are split into chunks of this size.
+BULK_MAX_RESOURCE_IDS = 200
+
+# The instance VCF Operations aggregates an instanced stat into, e.g.
+# disk:Aggregate of all instances|commandsAveraged_average.
+AGGREGATE_INSTANCE = "Aggregate of all instances"
+
 
 class SuiteApiError(Exception):
     """A Suite API call whose failure must not be read as "no data", e.g. the
@@ -49,6 +57,7 @@ class CallStats:
         self.calls = 0
         self.failures = 0
         self.stale = 0
+        self.stale_keys: dict[str, int] = {}
         self.newest_ms = 0
         self.started = time.monotonic()
 
@@ -59,7 +68,11 @@ class CallStats:
         return (
             f"Suite API: {self.calls} calls, {self.failures} failed, "
             f"{self.stale} stale, {self.elapsed():.1f}s"
-        )
+        ) + (f" (stale: {self.stale_keys})" if self.stale_keys else "")
+
+    def count_stale(self, statkey: str) -> None:
+        self.stale += 1
+        self.stale_keys[statkey] = self.stale_keys.get(statkey, 0) + 1
 
 
 CALL_STATS = CallStats()
@@ -168,61 +181,114 @@ def fetch_resource_keys(
     }
 
 
-def latest_stat(client: SuiteApiClient, resource_id: str, statkey: str) -> Optional[float]:
-    """
-    We only ever request a single statKey per call, so whatever comes back is
-    the value we asked for -- even when VCF Operations auto-aggregates an
-    instanced metric and renames the key with an instance prefix (e.g.
-    disk:Aggregate of all instances|commandsAveraged_average instead of
-    disk|commandsAveraged_average). Matching the returned key exactly against
-    the requested key silently dropped those aggregated values.
-
-    A sample older than the limit in is_stale() is no data (None), counted in
-    CALL_STATS.stale.
-    """
-    body = _get(
-        client,
-        f"/api/resources/{resource_id}/stats/latest",
-        params={"statKey": [statkey]},
-    )
-    if body is None:
-        return None
-    for entry in body.get("values", []):
-        for stat in entry.get("stat-list", {}).get("stat", []):
-            data = stat.get("data", [])
-            if data:
-                return _fresh_value(data[-1], stat.get("timestamps", []))
-    return None
-
-
-def _fresh_value(value: float, timestamps: list) -> Optional[float]:
+def _fresh_value(statkey: str, value: float, timestamps: list) -> Optional[float]:
     """The value, or None when its sample is stale. A stat with no timestamp
     cannot be shown to be fresh, so it is no data too."""
     if not timestamps:
-        CALL_STATS.stale += 1
+        CALL_STATS.count_stale(statkey)
         return None
     sample_ms = int(timestamps[-1])
     CALL_STATS.newest_ms = max(CALL_STATS.newest_ms, sample_ms)
     if is_stale(sample_ms, CALL_STATS.newest_ms):
-        CALL_STATS.stale += 1
+        CALL_STATS.count_stale(statkey)
         return None
     return value
 
 
-def get_property(client: SuiteApiClient, resource_id: str, property_name: str) -> Optional[str]:
+def _chunks(ids: list[str]) -> list[list[str]]:
+    return [ids[i:i + BULK_MAX_RESOURCE_IDS] for i in range(0, len(ids), BULK_MAX_RESOURCE_IDS)]
+
+
+def _aggregate_key(statkey: str) -> str:
+    """group|metric -> group:Aggregate of all instances|metric."""
+    group, sep, rest = statkey.partition("|")
+    return f"{group}:{AGGREGATE_INSTANCE}{sep}{rest}" if sep else statkey
+
+
+def _pick(returned: dict[str, Any], statkey: str) -> Optional[Any]:
+    """The returned entry for a requested key. Asked for a stat, VCF
+    Operations also returns every instance of it (cpu:26|utilization_average
+    for thread 26), so only the requested key counts -- or, when the stat is
+    only stored aggregated, its "Aggregate of all instances" instance, which
+    is what the single-key GET returned (see latest_stat)."""
+    if statkey in returned:
+        return returned[statkey]
+    return returned.get(_aggregate_key(statkey))
+
+
+def bulk_latest_stats(
+    client: SuiteApiClient, resource_ids: list[str], statkeys: list[str]
+) -> dict[tuple[str, str], float]:
     """
-    Resource PROPERTIES (config, inventory metadata) are a different endpoint
-    and response shape from stats -- /api/resources/{id}/properties, not
-    /stats/latest. Values come back as strings regardless of underlying type
-    (e.g. "10000.0" for a numeric linkspeed), so callers must cast.
+    {(resource_id, statkey): value} for every requested stat that has a fresh
+    latest sample, from POST /api/resources/stats/latest/query in chunks of
+    BULK_MAX_RESOURCE_IDS. A failed chunk counts as a failure and its stats
+    are missing (no data). Staleness is judged after every chunk is in, so
+    the reference (the newest sample) covers the whole request.
     """
-    body = _get(client, f"/api/resources/{resource_id}/properties")
-    if body is None:
-        return None
-    for prop in body.get("property", []):
-        if prop.get("name") == property_name:
-            return prop.get("value")
-    return None
+    samples: dict[tuple[str, str], tuple[float, list]] = {}
+    for chunk in _chunks(resource_ids):
+        body = _post(
+            client,
+            "/api/resources/stats/latest/query",
+            json={"resourceId": chunk, "statKey": statkeys, "maxSamples": 1},
+        )
+        if body is None:
+            continue
+        for entry in body.get("values", []):
+            returned = {}
+            for stat in entry.get("stat-list", {}).get("stat", []):
+                key = stat.get("statKey", {}).get("key")
+                if key and stat.get("data"):
+                    returned[key] = stat
+            for statkey in statkeys:
+                stat = _pick(returned, statkey)
+                if stat is not None:
+                    samples[(entry.get("resourceId"), statkey)] = (
+                        stat["data"][-1], stat.get("timestamps", [])
+                    )
+    for _value, timestamps in samples.values():
+        if timestamps:
+            CALL_STATS.newest_ms = max(CALL_STATS.newest_ms, int(timestamps[-1]))
+    fresh = {}
+    for (resource_id, statkey), (value, timestamps) in samples.items():
+        value = _fresh_value(statkey, value, timestamps)
+        if value is not None:
+            fresh[(resource_id, statkey)] = value
+    return fresh
+
+
+def bulk_latest_properties(
+    client: SuiteApiClient, resource_ids: list[str], property_keys: list[str]
+) -> dict[tuple[str, str], str]:
+    """
+    {(resource_id, property_key): value as a string} from POST
+    /api/resources/properties/latest/query in chunks of BULK_MAX_RESOURCE_IDS.
+    A text property comes back under "values", a number under "data"; both
+    are returned as strings, like the per-resource properties GET, so callers
+    cast. Properties are never stale (see STALE_AFTER_MINUTES).
+    """
+    found: dict[tuple[str, str], str] = {}
+    for chunk in _chunks(resource_ids):
+        body = _post(
+            client,
+            "/api/resources/properties/latest/query",
+            json={"resourceIds": chunk, "propertyKeys": property_keys},
+        )
+        if body is None:
+            continue
+        for entry in body.get("values", []):
+            contents = entry.get("property-contents", {}).get("property-content", [])
+            for prop in contents:
+                key = prop.get("statKey")
+                if isinstance(key, dict):
+                    key = key.get("key")
+                if key not in property_keys:
+                    continue
+                values = prop.get("values") or prop.get("data") or []
+                if values:
+                    found[(entry.get("resourceId"), key)] = str(values[-1])
+    return found
 
 
 def fetch_children_of_kind(

@@ -40,6 +40,7 @@ from suite_api import SuiteApiError
 from suite_api import fetch_resource_keys
 from suite_api import fetch_resources
 from traversal import collect_cluster_and_host_metrics
+from traversal import fetch_cluster_snapshot
 
 logger = logging.getLogger(__name__)
 
@@ -133,9 +134,10 @@ def collect(adapter_instance: AdapterInstance) -> CollectResult:
                 for cluster_id, cluster_name in clusters:
                     # One cluster failing must never lose the others.
                     try:
-                        metric_values = cluster.gather_metric_values(client, cluster_id)
+                        snap = fetch_cluster_snapshot(client, cluster_id)
+                        metric_values = cluster.gather_metric_values(snap)
                         cluster_vm_metrics, host_records = collect_cluster_and_host_metrics(
-                            client, cluster_id, monster_vm_threshold_pct
+                            snap, monster_vm_threshold_pct
                         )
                         metric_values.update(cluster_vm_metrics)
                         total_hosts += len(host_records)

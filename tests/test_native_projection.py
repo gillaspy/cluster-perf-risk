@@ -48,13 +48,16 @@ def run_collect(keys=True, fail_cluster=None):
     cm = {k: 1.0 for k in cn.CLUSTER_PROJECTION}
     hm = {k: 1.0 for k in cn.HOST_PROJECTION}
 
-    def gather(client, cluster_id):
-        if cluster_id == fail_cluster:
+    def snapshot(client, cluster_id):
+        return mock.MagicMock(cluster_id=cluster_id)
+
+    def gather(snap):
+        if snap.cluster_id == fail_cluster:
             raise RuntimeError("boom")
         return dict(cm)
 
-    def traverse(client, cluster_id, thr):
-        return {}, [("h-uuid-1", "esx01", dict(hm))] if cluster_id == "c-uuid-1" else [("h-uuid-2", "esx02", dict(hm))]
+    def traverse(snap, thr):
+        return {}, [("h-uuid-1", "esx01", dict(hm))] if snap.cluster_id == "c-uuid-1" else [("h-uuid-2", "esx02", dict(hm))]
 
     def keys_for(client, kind, adapter_kind):
         if not keys:
@@ -63,6 +66,7 @@ def run_collect(keys=True, fail_cluster=None):
 
     with mock.patch.object(adapter, "fetch_resources", return_value=CLUSTERS), \
          mock.patch.object(adapter, "fetch_resource_keys", side_effect=keys_for), \
+         mock.patch.object(adapter, "fetch_cluster_snapshot", side_effect=snapshot), \
          mock.patch.object(adapter.cluster, "gather_metric_values", side_effect=gather), \
          mock.patch.object(adapter, "collect_cluster_and_host_metrics", side_effect=traverse):
         return adapter.collect(FakeInstance())
