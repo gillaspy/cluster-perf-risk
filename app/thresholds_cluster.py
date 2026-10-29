@@ -20,7 +20,8 @@ from constants_cluster import METRIC_VMOTION_PCT
 # Each entry: green_max, yellow_max, orange_max. Anything above orange_max is red.
 BAND_BOUNDS = {
     METRIC_CPU_THREAD_UTILIZATION: {"green_max": 60, "yellow_max": 80, "orange_max": 90},
-    METRIC_MEMORY_BALLOONED: {"green_max": 1, "yellow_max": 1.25, "orange_max": 2},
+    # 2.1.0: aligned with the host scope (worst host's ballooned % of DRAM).
+    METRIC_MEMORY_BALLOONED: {"green_max": 1, "yellow_max": 2, "orange_max": 4},
     # Re-included 2026-08-17 now that network_throughput_pct is computed from
     # a working derived formula (see constants_cluster.py) instead of the
     # broken net|usage_capacity statkey -- these are the risk matrix's

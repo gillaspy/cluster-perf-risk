@@ -42,21 +42,21 @@
             "configs": [
               {
                 "colorBy": {
-                  "metricKey": "Performance Risk|Composite|Risk Score",
-                  "value": "Performance Risk|Composite|Risk Score"
+                  "metricKey": "Performance Risk|Composite|Risk Band Level",
+                  "value": "Performance Risk|Composite|Risk Band Level"
                 },
                 "focusOnGroups": false,
                 "color": {
                   "thresholds": {
                     "values": [
                       0,
-                      59.99,
-                      60,
-                      79.99,
-                      80,
-                      89.99,
-                      90,
-                      100
+                      0.5,
+                      0.51,
+                      1.5,
+                      1.51,
+                      2.5,
+                      2.51,
+                      3
                     ],
                     "colors": [
                       "#74B43B",
@@ -99,21 +99,21 @@
               },
               {
                 "colorBy": {
-                  "metricKey": "Performance Risk|Composite|Risk Score",
-                  "value": "Performance Risk|Composite|Risk Score"
+                  "metricKey": "Performance Risk|Composite|Risk Band Level",
+                  "value": "Performance Risk|Composite|Risk Band Level"
                 },
                 "focusOnGroups": true,
                 "color": {
                   "thresholds": {
                     "values": [
                       0,
-                      59.99,
-                      60,
-                      79.99,
-                      80,
-                      89.99,
-                      90,
-                      100
+                      0.5,
+                      0.51,
+                      1.5,
+                      1.51,
+                      2.5,
+                      2.51,
+                      3
                     ],
                     "colors": [
                       "#74B43B",
@@ -197,7 +197,7 @@
               "relationshipMode": 0
             },
             "valueSize": 24,
-            "title": "Performance Risk %",
+            "title": "Performance Risk Band",
             "boxHeight": null,
             "showResourceName": {
               "showResourceName": true
@@ -237,38 +237,38 @@
               "resourceMetrics": [],
               "resourceKindMetrics": [
                 {
-                  "yellowBound": 60,
+                  "yellowBound": 1,
                   "metricUnitId": null,
-                  "metricName": "Risk Score",
-                  "metricKey": "Performance Risk|Composite|Risk Score",
+                  "metricName": "Risk Band Level",
+                  "metricKey": "Performance Risk|Composite|Risk Band Level",
                   "handleOldColoring": false,
                   "maxValue": "",
                   "link": "",
                   "resourceKindName": "Cluster Compute Resource",
                   "isStringMetric": false,
                   "resourceKindId": "resourceKind:id:0_::_",
-                  "label": "Cluster Risk",
-                  "orangeBound": 80,
+                  "label": "Cluster Risk Band",
+                  "orangeBound": 2,
                   "unit": "",
-                  "redBound": 90,
+                  "redBound": 3,
                   "id": "extModel2065-1",
                   "colorMethod": 0
                 },
                 {
-                  "yellowBound": 60,
+                  "yellowBound": 1,
                   "metricUnitId": null,
-                  "metricName": "Risk Score",
-                  "metricKey": "Performance Risk|Composite|Risk Score",
+                  "metricName": "Risk Band Level",
+                  "metricKey": "Performance Risk|Composite|Risk Band Level",
                   "handleOldColoring": false,
                   "maxValue": "",
                   "link": "",
                   "resourceKindName": "Host System",
                   "isStringMetric": false,
                   "resourceKindId": "resourceKind:id:1_::_",
-                  "label": "Host Risk",
-                  "orangeBound": 80,
+                  "label": "Host Risk Band",
+                  "orangeBound": 2,
                   "unit": "",
-                  "redBound": 90,
+                  "redBound": 3,
                   "id": "extModel3100-1",
                   "colorMethod": 0
                 }

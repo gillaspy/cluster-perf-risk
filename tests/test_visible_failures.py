@@ -50,20 +50,22 @@ def fresh_stats():
     yield
 
 
-def stat_body(value):
-    return {"values": [{"stat-list": {"stat": [{"data": [value]}]}}]}
+def stat_body(value, rid="r1", key="cpu|x"):
+    ts = suite_api.now_ms()
+    return {"values": [{"resourceId": rid, "stat-list": {"stat": [
+        {"statKey": {"key": key}, "timestamps": [ts], "data": [value]}]}}]}
 
 
 def test_successful_call_is_counted():
     c = client_returning(FakeResponse(200, stat_body(42.0)))
-    assert suite_api.latest_stat(c, "r1", "cpu|x") == 42.0
+    assert suite_api.bulk_latest_stats(c, ["r1"], ["cpu|x"]) == {("r1", "cpu|x"): 42.0}
     assert (suite_api.CALL_STATS.calls, suite_api.CALL_STATS.failures) == (1, 0)
 
 
 def test_failed_call_is_no_data_and_counted():
     c = client_returning(FakeResponse(401), FakeResponse(500), FakeResponse(404))
-    assert suite_api.latest_stat(c, "r1", "cpu|x") is None
-    assert suite_api.get_property(c, "r1", "p") is None
+    assert suite_api.bulk_latest_stats(c, ["r1"], ["cpu|x"]) == {}
+    assert suite_api.bulk_latest_properties(c, ["r1"], ["p"]) == {}
     assert suite_api.fetch_children_of_kind(c, "r1", "VirtualMachine") == []
     assert (suite_api.CALL_STATS.calls, suite_api.CALL_STATS.failures) == (3, 3)
 
@@ -71,7 +73,7 @@ def test_failed_call_is_no_data_and_counted():
 def test_exception_is_counted_and_reraised():
     c = client_returning(ConnectionError("down"))
     with pytest.raises(ConnectionError):
-        suite_api.latest_stat(c, "r1", "cpu|x")
+        suite_api.bulk_latest_stats(c, ["r1"], ["cpu|x"])
     assert (suite_api.CALL_STATS.calls, suite_api.CALL_STATS.failures) == (1, 1)
 
 
@@ -110,7 +112,7 @@ def test_all_clusters_failing_is_reported():
     def boom(client, cluster_id):
         raise RuntimeError("boom")
 
-    with mock.patch.object(adapter.cluster, "gather_metric_values", side_effect=boom), \
+    with mock.patch.object(adapter, "fetch_cluster_snapshot", side_effect=boom), \
          mock.patch.object(adapter, "fetch_resources", return_value=CLUSTERS), \
          mock.patch.object(adapter, "fetch_resource_keys", return_value={}):
         res = adapter.collect(_instance())
@@ -124,7 +126,7 @@ def test_failed_inventory_query_is_reported():
 
 
 def test_every_stats_call_failing_is_reported():
-    def gather(client, cluster_id):
+    def gather(snap):
         # Simulates every per-cluster call coming back non-2xx.
         suite_api.CALL_STATS.calls += 3
         suite_api.CALL_STATS.failures += 3
@@ -140,6 +142,7 @@ def test_every_stats_call_failing_is_reported():
 
     with mock.patch.object(adapter, "fetch_resources", side_effect=inventory), \
          mock.patch.object(adapter, "fetch_resource_keys", side_effect=keys), \
+         mock.patch.object(adapter, "fetch_cluster_snapshot", return_value=mock.MagicMock()), \
          mock.patch.object(adapter.cluster, "gather_metric_values", side_effect=gather), \
          mock.patch.object(adapter, "collect_cluster_and_host_metrics", return_value=({}, [])):
         res = adapter.collect(_instance())

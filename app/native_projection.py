@@ -17,8 +17,11 @@ import aria.ops.adapter_logging as logging
 from aria.ops.object import Identifier
 from aria.ops.object import Object
 from aria.ops.result import CollectResult
+import scoring
 from constants_native import COMPOSITE_BAND_ATTR
+from constants_native import COMPOSITE_BAND_LEVEL_ATTR
 from constants_native import COMPOSITE_SCORE_ATTR
+from constants_native import COMPOSITE_WORST_COUNT_ATTR
 from constants_native import band_attr
 from constants_native import metric_attr
 
@@ -76,4 +79,10 @@ def project(
         count += 1
     target.with_metric(COMPOSITE_SCORE_ATTR, composite_score)
     target.with_property(COMPOSITE_BAND_ATTR, composite_band)
-    return count + 2
+    count += 2
+    worst_count = scoring.metrics_in_worst_band(composite_band, per_metric_band)
+    if worst_count is not None:
+        target.with_metric(COMPOSITE_BAND_LEVEL_ATTR, scoring.BAND_LEVELS[composite_band])
+        target.with_metric(COMPOSITE_WORST_COUNT_ATTR, worst_count)
+        count += 2
+    return count

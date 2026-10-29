@@ -6,11 +6,47 @@ VMWARE `ClusterComputeResource` (cluster scope) and `HostSystem` (host scope)
 objects, under the root `Performance Risk|<Group>|<Label>`. The tables below use
 the internal metric keys; [Native attribute names](#native-attribute-names)
 maps each key to its attribute. Each metric also has a `... Band` string
-property (green/yellow/orange/red/unknown), plus a composite risk score and
-band per scope.
+property (green/yellow/orange/red/unknown), plus a composite risk score,
+band, band level and worst-band count per scope.
 
 All formulas below are transcribed from `app/cluster.py`, `app/host.py`,
 `app/traversal.py`, and `app/scoring.py`.
+
+---
+
+## Which data counts
+
+These rules apply to every metric below.
+
+- **Powered-on VMs only.** A VM counts only when its property
+  `summary|runtime|powerState` is `Powered On`; a VM without that property
+  does not count. Powered-off VMs are left out of the worst/P90 samples, the
+  vCPU and memory totals, overcommit and the monster VM counts. Their stats
+  are not even read.
+- **Stale stats are no data.** A stat whose latest sample is more than
+  `STALE_AFTER_MINUTES` (10, two collection cycles) older than the newest
+  sample VCF Operations returned in the same request is no data, never its
+  last known value. Both timestamps come from VCF Operations, so the
+  collector's clock plays no part. As a backstop for the case where nothing
+  updates at all (the vCenter adapter stopped), a sample more than 15
+  minutes older than the collector's clock (10 +
+  `CLOCK_SKEW_TOLERANCE_MINUTES`, 5) is no data too. A stat without a
+  timestamp is no data. Properties are never stale: VCF Operations stores a
+  property only when it changes. Each cycle's INFO log line
+  `Suite API: <n> calls, <f> failed, <s> stale, <t>s` counts them, by key.
+- **Host memory is DRAM.** The host memory denominator (ballooned %, memory
+  overcommit, memory monster VMs) is the DRAM tier stat
+  `mem:DRAM|memory_tier_total_capacity` (KB), or `mem|host_provisioned` (KB)
+  when that has no value. On a host with memory tiering,
+  `mem|host_provisioned` includes the NVMe tier, which VMs do not run in.
+  Neither has a value: the memory rows are no data.
+- **No data is never a value.** A metric with no data is not published, its
+  band is `unknown`, and it is left out of the composite.
+- **Read in bulk.** Each cluster's hosts and VMs come from its relationships
+  (one call for the hosts, one per host for its VMs); their stats and
+  properties come from `POST /api/resources/stats/latest/query` and
+  `POST /api/resources/properties/latest/query`, in chunks of 200 resource
+  IDs (`BULK_MAX_RESOURCE_IDS`).
 
 ---
 
@@ -26,19 +62,19 @@ existing relationships (cluster -> hosts) are native and untouched.
 | `cluster_cpu_imbalance` | Cluster Cpu Imbalance | Cluster-level native statkey `clusterServices\|total_imbalance`, divided by 1000 (native value is in thousandths of a standard deviation) |
 | `cluster_cpu_overcommit_ratio` | Cluster Cpu Overcommit Ratio | Cluster-level native statkey `cpu\|vcpus_to_cores_allocation_ratio` (ClusterComputeResource-only) |
 | `cluster_memory_overcommit_ratio` | Cluster Memory Overcommit Ratio | Cluster-level native statkey `mem\|virtual_to_physical_memory_allocation_ratio` (ClusterComputeResource-only) |
-| `memory_ballooned_pct` | Memory Ballooned Pct | Per host: (`mem\|vmmemctl_average` KB ÷ `mem\|host_provisioned` KB) × 100; result is the MAX across the cluster's hosts |
+| `memory_ballooned_pct` | Memory Ballooned Pct | Per host: (`mem\|vmmemctl_average` KB ÷ host DRAM KB) × 100; result is the MAX across the cluster's hosts |
 | `network_throughput_pct` | Network Throughput Pct | Per host: (`net\|usage_average` KBps × 8 ÷ 1000 → Mbps) ÷ `config\|network\|linkspeed` (Mbps, a resource property) × 100; result is the MAX across the cluster's hosts |
 | `highest_host_cpu_imbalance_pct` | Highest ESXi CPU Imbalance Pct | Population standard deviation (`statistics.pstdev`) of `cpu\|utilization_average` across the cluster's hosts (requires ≥2 hosts with data) — a synthetic proxy; no native per-host imbalance statkey exists |
-| `cluster_cpu_monster_vm_ratio` | Cluster CPU Monster VM Ratio | (count of VMs in the cluster whose vCPU count exceeds `monster_vm_threshold_pct`% of their host's total cores) ÷ host count |
-| `cluster_memory_monster_vm_ratio` | Cluster Memory Monster VM Ratio | (count of VMs in the cluster whose memory exceeds `monster_vm_threshold_pct`% of their host's total memory) ÷ host count |
+| `cluster_cpu_monster_vm_ratio` | Cluster CPU Monster VM Ratio | (count of powered-on VMs in the cluster whose vCPU count exceeds `monster_vm_threshold_pct`% of their host's total cores) ÷ host count |
+| `cluster_memory_monster_vm_ratio` | Cluster Memory Monster VM Ratio | (count of powered-on VMs in the cluster whose memory exceeds `monster_vm_threshold_pct`% of their host's DRAM) ÷ host count |
 | `vmotion_pct` | vMotion Pct | `summary\|number_vmotion` ÷ (`summary\|vm_count_per_host` × host count) × 100 |
-| `worst_vcpu_ready_pct` | Worst vCPU Ready Pct | MAX of `cpu\|20_sec_peak_readyPct` across every VM in the cluster |
+| `worst_vcpu_ready_pct` | Worst vCPU Ready Pct | MAX of `cpu\|20_sec_peak_readyPct` across every powered-on VM in the cluster |
 | `p90_vcpu_ready_pct` | P90 vCPU Ready Pct | 90th percentile (nearest-rank) of the same cluster-wide VM sample set |
-| `worst_vcpu_costop_pct` | Worst vCPU Co-Stop Pct | MAX of `cpu\|20_sec_peak_costopPct` across every VM in the cluster |
+| `worst_vcpu_costop_pct` | Worst vCPU Co-Stop Pct | MAX of `cpu\|20_sec_peak_costopPct` across every powered-on VM in the cluster |
 | `p90_vcpu_costop_pct` | P90 vCPU Co-Stop Pct | P90 (nearest-rank) of the same cluster-wide VM sample set |
-| `worst_memory_contention_pct` | Worst Memory Contention Pct | MAX of `mem\|20_sec_peak_host_contentionPct` across every VM in the cluster |
+| `worst_memory_contention_pct` | Worst Memory Contention Pct | MAX of `mem\|20_sec_peak_host_contentionPct` across every powered-on VM in the cluster |
 | `p90_memory_contention_pct` | P90 Memory Contention Pct | P90 (nearest-rank) of the same cluster-wide VM sample set |
-| `worst_disk_latency_ms` | Worst Disk Latency Ms | MAX of `virtualDisk\|20_sec_peak_totalLatency_average` across every VM in the cluster |
+| `worst_disk_latency_ms` | Worst Disk Latency Ms | MAX of `virtualDisk\|20_sec_peak_totalLatency_average` across every powered-on VM in the cluster |
 | `p90_disk_latency_ms` | P90 Disk Latency Ms | P90 (nearest-rank) of the same cluster-wide VM sample set |
 | `host_memory_contention_pct` | Host Memory Contention Pct | MAX across the cluster's hosts of native statkey `mem\|host_contentionPct` |
 | `host_dropped_packets_pct` | Host Dropped Packets Pct | MAX across the cluster's hosts of native statkey `net\|droppedPct` |
@@ -56,19 +92,19 @@ The native host object is matched by its Suite API `resourceKey`.
 |---|---|---|
 | `host_cpu_thread_utilization_pct` | CPU Thread Utilization Pct | This host's own native statkey `cpu\|utilization_average` |
 | `host_memory_consumed_pct` | Memory Consumed Pct | This host's own native statkey `mem\|usage_average` (already a %) |
-| `host_memory_ballooned_pct` | Memory Ballooned Pct | (`mem\|vmmemctl_average` KB ÷ `mem\|host_provisioned` KB) × 100, this host only |
+| `host_memory_ballooned_pct` | Memory Ballooned Pct | (`mem\|vmmemctl_average` KB ÷ host DRAM KB) × 100, this host only |
 | `host_cpu_reservation_pct` | CPU Reservation Pct | (`cpu\|reservedCapacity_average` MHz ÷ `cpu\|capacity_provisioned` MHz) × 100 |
 | `host_memory_reservation_pct` | Memory Reservation Pct | This host's own native statkey `mem\|reservedCapacityPct` (already a %) |
-| `host_cpu_overcommit_ratio` | CPU Overcommit Ratio | (sum of this host's VMs' vCPU count, `config\|hardware\|num_Cpu`) ÷ this host's core count (`hardware\|cpuInfo\|num_CpuCores`) — derived; no native HostSystem statkey exists |
-| `host_memory_overcommit_ratio` | Memory Overcommit Ratio | (sum of this host's VMs' memory KB, `mem\|guest_provisioned`) ÷ this host's total memory KB (`mem\|host_provisioned`) — derived; no native HostSystem statkey exists |
-| `host_monster_vm_count` | Monster VM Count | Count of VMs on this host whose vCPU count exceeds `monster_vm_threshold_pct`% of the host's cores, OR whose memory exceeds `monster_vm_threshold_pct`% of the host's memory |
-| `worst_vcpu_ready_pct` | Worst vCPU Ready Pct | MAX of `cpu\|20_sec_peak_readyPct` across this host's own VMs |
+| `host_cpu_overcommit_ratio` | CPU Overcommit Ratio | vCPUs of this host's powered-on VMs (`cpu\|vcpus_allocated_on_all_powered_on_vms`, or the sum of their `config\|hardware\|num_Cpu` when that has no value) ÷ this host's core count (`hardware\|cpuInfo\|num_CpuCores`) |
+| `host_memory_overcommit_ratio` | Memory Overcommit Ratio | Memory KB of this host's powered-on VMs (`mem\|memory_allocated_on_all_powered_on_vms`, or the sum of their `mem\|guest_provisioned`) ÷ this host's DRAM KB |
+| `host_monster_vm_count` | Monster VM Count | Count of powered-on VMs on this host whose vCPU count exceeds `monster_vm_threshold_pct`% of the host's cores, OR whose memory exceeds `monster_vm_threshold_pct`% of the host's DRAM |
+| `worst_vcpu_ready_pct` | Worst vCPU Ready Pct | MAX of `cpu\|20_sec_peak_readyPct` across this host's own powered-on VMs |
 | `p90_vcpu_ready_pct` | P90 vCPU Ready Pct | P90 (nearest-rank) of the same per-host VM sample set |
-| `worst_vcpu_costop_pct` | Worst vCPU Co-Stop Pct | MAX of `cpu\|20_sec_peak_costopPct` across this host's own VMs |
+| `worst_vcpu_costop_pct` | Worst vCPU Co-Stop Pct | MAX of `cpu\|20_sec_peak_costopPct` across this host's own powered-on VMs |
 | `p90_vcpu_costop_pct` | P90 vCPU Co-Stop Pct | P90 (nearest-rank) of the same per-host VM sample set |
-| `worst_memory_contention_pct` | Worst Memory Contention Pct | MAX of `mem\|20_sec_peak_host_contentionPct` across this host's own VMs |
+| `worst_memory_contention_pct` | Worst Memory Contention Pct | MAX of `mem\|20_sec_peak_host_contentionPct` across this host's own powered-on VMs |
 | `p90_memory_contention_pct` | P90 Memory Contention Pct | P90 (nearest-rank) of the same per-host VM sample set |
-| `worst_disk_latency_ms` | Worst Disk Latency Ms | MAX of `virtualDisk\|20_sec_peak_totalLatency_average` across this host's own VMs |
+| `worst_disk_latency_ms` | Worst Disk Latency Ms | MAX of `virtualDisk\|20_sec_peak_totalLatency_average` across this host's own powered-on VMs |
 | `p90_disk_latency_ms` | P90 Disk Latency Ms | P90 (nearest-rank) of the same per-host VM sample set |
 | `host_memory_contention_pct` | Memory Contention Pct | This host's own native statkey `mem\|host_contentionPct` |
 | `host_dropped_packets_pct` | Dropped Packets Pct | This host's own native statkey `net\|droppedPct` |
@@ -109,10 +145,64 @@ weight tables (shared thresholds from `thresholds_shared.py` merged with
    — 70% weight on the single worst sub-metric's band floor, 30% on the
    weighted average across all sub-metrics, so one red sub-metric can't be
    diluted into invisibility by several green ones.
-6. **Composite band** is then derived from the composite score itself:
-   `≥90 → red`, `≥80 → orange`, `≥60 → yellow`, else `green`.
-7. If every sub-metric fails to collect, the composite is reported as
-   `0.0` / `"unknown"` rather than a false "green".
+6. **Composite band** (since 2.1.0) is the worst band among the known
+   sub-metrics: `red > orange > yellow > green`. One red sub-metric makes the
+   object red, however many are green. The band no longer comes from the
+   score: one red sub-metric among greens scores 63-66, which the old score
+   bands (`≥90 red, ≥80 orange, ≥60 yellow`) drew yellow. The score ranges of
+   the bands overlap (green 0, yellow 42-60, orange 56-80, red 63-90), so
+   color by the band, not by score thresholds.
+7. **Risk Band Level** is the band as a number: `green 0, yellow 1, orange 2,
+   red 3`. Dashboards color by it (the shipped dashboard's heatmap and
+   scoreboard do), because widgets color by a number, not a string.
+8. **Metrics In Worst Band** is how many known sub-metrics are in that band:
+   with a red band, 1 means a single red sub-metric, 4 means four.
+9. If every sub-metric fails to collect, the composite is reported as
+   `0.0` / `"unknown"` rather than a false "green", and neither Risk Band
+   Level nor Metrics In Worst Band is published.
+
+---
+
+## Thresholds
+
+Each band is `value ≤ green_max` green, `≤ yellow_max` yellow, `≤ orange_max`
+orange, above that red. Pinned by `tests/test_threshold_tables.py`.
+
+| Metric key | Scope | green_max | yellow_max | orange_max |
+|---|---|---|---|---|
+| `worst_vcpu_ready_pct` | both | 4 | 8 | 16 |
+| `p90_vcpu_ready_pct` | both | 1 | 2 | 4 |
+| `worst_vcpu_costop_pct` | both | 2 | 4 | 8 |
+| `p90_vcpu_costop_pct` | both | 0.5 | 1 | 2 |
+| `worst_memory_contention_pct` | both | 1 | 2 | 4 |
+| `p90_memory_contention_pct` | both | 0.5 | 1 | 2 |
+| `worst_disk_latency_ms` | both | 40 | 80 | 120 |
+| `p90_disk_latency_ms` | both | 20 | 40 | 60 |
+| `host_memory_contention_pct` | both | 0.25 | 0.5 | 1 |
+| `host_dropped_packets_pct` | both | 0 | 0.2 | 0.4 |
+| `cpu_thread_utilization_pct` | cluster | 60 | 80 | 90 |
+| `memory_ballooned_pct` | cluster | 1 | 2 | 4 |
+| `network_throughput_pct` | cluster | 1 | 2 | 4 |
+| `disk_iops` | cluster | 25000 | 50000 | 100000 |
+| `highest_host_cpu_imbalance_pct` | cluster | 5 | 10 | 20 |
+| `cluster_cpu_imbalance` | cluster | 0.05 | 0.08 | 0.12 |
+| `vmotion_pct` | cluster | 1 | 2 | 4 |
+| `cluster_cpu_overcommit_ratio` | cluster | 1 | 2 | 3 |
+| `cluster_memory_overcommit_ratio` | cluster | 1 | 1.25 | 1.5 |
+| `cluster_cpu_monster_vm_ratio` | cluster | 1 | 2 | 4 |
+| `cluster_memory_monster_vm_ratio` | cluster | 1 | 2 | 4 |
+| `host_cpu_thread_utilization_pct` | host | 60 | 80 | 90 |
+| `host_memory_consumed_pct` | host | 80 | 90 | 95 |
+| `host_memory_ballooned_pct` | host | 1 | 2 | 4 |
+| `host_cpu_reservation_pct` | host | 10 | 40 | 60 |
+| `host_memory_reservation_pct` | host | 10 | 40 | 60 |
+| `host_cpu_overcommit_ratio` | host | 1 | 2 | 3 |
+| `host_memory_overcommit_ratio` | host | 1 | 1.4 | 1.8 |
+| `host_monster_vm_count` | host | 0 | 1 | 2 |
+
+Changed in 2.1.0: `p90_vcpu_costop_pct` (was 1/2/4), `memory_ballooned_pct`
+(was 1/1.25/2), `host_memory_overcommit_ratio` (was 1/1.4/1.6),
+`host_cpu_reservation_pct` and `host_memory_reservation_pct` (were 40/60/80).
 
 ---
 
@@ -120,7 +210,7 @@ weight tables (shared thresholds from `thresholds_shared.py` merged with
 
 - `monster_vm_threshold_pct` (default `50`) is a user-configurable adapter
   parameter — a VM counts as a "monster VM" when its vCPU count or memory
-  exceeds that percentage of its host's total cores/memory (a proxy for
+  exceeds that percentage of its host's total cores/DRAM (a proxy for
   "may not fit in one NUMA node"; NUMA topology itself is not exposed via
   SuiteAPI).
 - All VM-level "worst"/"p90" pairs use nearest-rank percentile (not
@@ -185,6 +275,8 @@ Attributes are written to the native object of the matching scope under
 | Host | `host_memory_overcommit_ratio` | `Performance Risk|Memory|Overcommit Ratio` |
 | Cluster, Host | composite score | `Performance Risk|Composite|Risk Score` |
 | Cluster, Host | composite band | `Performance Risk|Composite|Risk Band` (property) |
+| Cluster, Host | composite band as 0-3 | `Performance Risk|Composite|Risk Band Level` |
+| Cluster, Host | known sub-metrics in the composite band | `Performance Risk|Composite|Metrics In Worst Band` |
 
 Guarantees (enforced by `tests/test_native_projection.py`): every key starts
 with `Performance Risk|`; none collides with a native statkey or the
