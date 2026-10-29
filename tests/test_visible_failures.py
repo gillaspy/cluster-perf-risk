@@ -51,7 +51,8 @@ def fresh_stats():
 
 
 def stat_body(value):
-    return {"values": [{"stat-list": {"stat": [{"data": [value]}]}}]}
+    ts = suite_api.now_ms()
+    return {"values": [{"stat-list": {"stat": [{"timestamps": [ts], "data": [value]}]}}]}
 
 
 def test_successful_call_is_counted():

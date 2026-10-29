@@ -18,7 +18,9 @@ from typing import Optional
 
 import aria.ops.adapter_logging as logging
 from aria.ops.suite_api_client import SuiteApiClient
+from constants_shared import CLOCK_SKEW_TOLERANCE_MINUTES
 from constants_shared import RESOURCE_KIND_HOST
+from constants_shared import STALE_AFTER_MINUTES
 
 logger = logging.getLogger(__name__)
 
@@ -35,7 +37,10 @@ class SuiteApiError(Exception):
 class CallStats:
     """HTTP calls made and failed in one collection cycle. A failure is a
     non-2xx response or an exception (connection error, timeout). Token
-    requests made by the SDK client itself are not counted."""
+    requests made by the SDK client itself are not counted. `stale` counts
+    stats that came back but were too old to use (see is_stale), and
+    `newest_ms` is the newest sample timestamp VCF Operations returned this
+    cycle, the reference for is_stale."""
 
     def __init__(self) -> None:
         self.reset()
@@ -43,6 +48,8 @@ class CallStats:
     def reset(self) -> None:
         self.calls = 0
         self.failures = 0
+        self.stale = 0
+        self.newest_ms = 0
         self.started = time.monotonic()
 
     def elapsed(self) -> float:
@@ -51,11 +58,35 @@ class CallStats:
     def summary(self) -> str:
         return (
             f"Suite API: {self.calls} calls, {self.failures} failed, "
-            f"{self.elapsed():.1f}s"
+            f"{self.stale} stale, {self.elapsed():.1f}s"
         )
 
 
 CALL_STATS = CallStats()
+
+
+def now_ms() -> int:
+    """The collector's clock, in ms. A function so tests can replace it."""
+    return int(time.time() * 1000)
+
+
+def is_stale(sample_ms: int, newest_ms: int) -> bool:
+    """
+    True when a sample is too old to use. Two checks:
+
+    * Against the newest sample VCF Operations returned this cycle: older by
+      more than STALE_AFTER_MINUTES is stale. Both timestamps come from VCF
+      Operations, so the collector's clock plays no part. This catches what
+      actually goes stale -- a powered-off VM, a disconnected host -- while
+      everything else keeps updating.
+    * Against the collector's clock, with CLOCK_SKEW_TOLERANCE_MINUTES of
+      slack: catches the case the first cannot, where nothing is updating at
+      all (the vCenter adapter stopped), so the newest sample is old too.
+    """
+    limit_ms = STALE_AFTER_MINUTES * 60_000
+    if newest_ms - sample_ms > limit_ms:
+        return True
+    return now_ms() - sample_ms > limit_ms + CLOCK_SKEW_TOLERANCE_MINUTES * 60_000
 
 
 def _request(client: SuiteApiClient, method: str, url: str, **kwargs: Any) -> Optional[Any]:
@@ -145,6 +176,9 @@ def latest_stat(client: SuiteApiClient, resource_id: str, statkey: str) -> Optio
     disk:Aggregate of all instances|commandsAveraged_average instead of
     disk|commandsAveraged_average). Matching the returned key exactly against
     the requested key silently dropped those aggregated values.
+
+    A sample older than the limit in is_stale() is no data (None), counted in
+    CALL_STATS.stale.
     """
     body = _get(
         client,
@@ -157,8 +191,22 @@ def latest_stat(client: SuiteApiClient, resource_id: str, statkey: str) -> Optio
         for stat in entry.get("stat-list", {}).get("stat", []):
             data = stat.get("data", [])
             if data:
-                return data[-1]
+                return _fresh_value(data[-1], stat.get("timestamps", []))
     return None
+
+
+def _fresh_value(value: float, timestamps: list) -> Optional[float]:
+    """The value, or None when its sample is stale. A stat with no timestamp
+    cannot be shown to be fresh, so it is no data too."""
+    if not timestamps:
+        CALL_STATS.stale += 1
+        return None
+    sample_ms = int(timestamps[-1])
+    CALL_STATS.newest_ms = max(CALL_STATS.newest_ms, sample_ms)
+    if is_stale(sample_ms, CALL_STATS.newest_ms):
+        CALL_STATS.stale += 1
+        return None
+    return value
 
 
 def get_property(client: SuiteApiClient, resource_id: str, property_name: str) -> Optional[str]:

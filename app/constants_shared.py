@@ -13,6 +13,22 @@ RESOURCE_KIND_CLUSTER = "ClusterComputeResource"
 RESOURCE_KIND_HOST = "HostSystem"
 RESOURCE_KIND_VM = "VirtualMachine"
 
+# Only powered-on VMs are counted (worst/P90 samples, vCPU and memory totals,
+# overcommit, monster VMs). A powered-off VM keeps its last stats as "latest"
+# forever, and its configured size is not using the host. A VM whose property
+# is missing is not counted either.
+VM_POWER_STATE_PROPERTY = "summary|runtime|powerState"
+VM_POWERED_ON = "Powered On"
+
+# A stat whose latest sample is older than this is no data (see
+# suite_api.is_stale). Two 5-minute collection cycles, so one late cycle does
+# not blank everything. Properties are never stale: VCF Operations stores a
+# property only when it changes, so its last value is its current value.
+STALE_AFTER_MINUTES = 10
+# How far the collector's own clock may be ahead of VCF Operations before the
+# clock-based half of the staleness check gives a false "stale".
+CLOCK_SKEW_TOLERANCE_MINUTES = 5
+
 # Adapter parameter key for the monster-VM threshold (see get_adapter_definition
 # in adapter.py). Read via adapter_instance.get_identifier_value() at collect
 # time -- never hardcode the threshold in adapter.py. Feeds monster VM detection

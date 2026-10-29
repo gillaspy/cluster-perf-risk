@@ -8,6 +8,10 @@ the host-only metrics (CPU thread util, memory consumed/ballooned/reservation,
 CPU+memory overcommit ratio, monster VM count) per host, since we're already
 there for each one.
 
+Only powered-on VMs are counted (VM_POWER_STATE_PROPERTY): a powered-off VM's
+"latest" stats are its last ones before it stopped, and its size does not use
+the host.
+
 Doing 10+ separate host->VM traversals per cluster per collection cycle (one
 per metric, times two resource kinds) would multiply API calls unnecessarily
 at scale -- confirmed worth avoiding: wld-cl01 alone has 7 VMs across 3 hosts,
@@ -20,6 +24,7 @@ from __future__ import annotations
 import math
 from typing import Optional
 
+import aria.ops.adapter_logging as logging
 from aria.ops.suite_api_client import SuiteApiClient
 from constants_cluster import METRIC_CLUSTER_CPU_MONSTER_VM_RATIO
 from constants_cluster import METRIC_CLUSTER_MEMORY_MONSTER_VM_RATIO
@@ -44,13 +49,18 @@ from constants_shared import MEMORY_TOTAL_CAPACITY_KB_STATKEY
 from constants_shared import METRIC_HOST_DROPPED_PACKETS
 from constants_shared import METRIC_HOST_MEMORY_CONTENTION
 from constants_shared import RESOURCE_KIND_VM
+from constants_shared import VM_POWER_STATE_PROPERTY
+from constants_shared import VM_POWERED_ON
 from constants_shared import VM_LEVEL_STATKEYS
 from constants_shared import VM_MEMORY_KB_STATKEY
 from constants_shared import VM_NUM_CPU_STATKEY
 from constants_shared import VM_WORST_P90_METRICS
 from suite_api import fetch_child_hosts
 from suite_api import fetch_children_of_kind
+from suite_api import get_property
 from suite_api import latest_stat
+
+logger = logging.getLogger(__name__)
 
 
 def _percentile(sorted_values: list[float], pct: float) -> float:
@@ -98,6 +108,7 @@ def collect_cluster_and_host_metrics(
     host_memory_contention_samples = []
     host_dropped_packets_samples = []
     host_records: list[tuple[str, str, dict[str, Optional[float]]]] = []
+    vms_not_powered_on = 0
 
     for host_id, host_name in host_ids_and_names:
         host_cores = latest_stat(client, host_id, HOST_CPU_CORES_STATKEY)
@@ -137,6 +148,9 @@ def collect_cluster_and_host_metrics(
         host_total_vmem_kb = 0.0
 
         for vm_id, _vm_name in vm_records:
+            if get_property(client, vm_id, VM_POWER_STATE_PROPERTY) != VM_POWERED_ON:
+                vms_not_powered_on += 1
+                continue
             vcpu = latest_stat(client, vm_id, VM_NUM_CPU_STATKEY)
             if vcpu is not None:
                 host_total_vcpu += vcpu
@@ -177,6 +191,9 @@ def collect_cluster_and_host_metrics(
         }
         _worst_p90_into(host_metric_values, host_vm_samples)
         host_records.append((host_id, host_name, host_metric_values))
+
+    if vms_not_powered_on:
+        logger.debug(f"Cluster {cluster_id}: {vms_not_powered_on} VMs not powered on, not counted")
 
     host_count = len(host_ids_and_names)
     cluster_results: dict[str, Optional[float]] = {
