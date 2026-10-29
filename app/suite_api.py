@@ -6,11 +6,58 @@ NOTE: SuiteApiClient.query_for_resources() (a convenience method) discards
 the internal resource UUID needed for subsequent stats/relationship calls,
 so these helpers call the Suite API directly instead.
 """
+from contextlib import contextmanager
 from typing import Any
+from typing import Iterator
 from typing import Optional
 
+import aria.ops.adapter_logging as logging
 from aria.ops.suite_api_client import SuiteApiClient
 from constants_shared import RESOURCE_KIND_HOST
+
+logger = logging.getLogger(__name__)
+
+# (connect, read) timeout in seconds for every Suite API request. The SDK
+# client sets none, and neither does the Cloud Proxy for a collection, so
+# without one a hung VCF Operations node holds the collection, and the
+# session token, until the process is killed.
+REQUEST_TIMEOUT = (15, 120)
+
+
+def apply_request_timeout(client: SuiteApiClient, timeout: tuple = REQUEST_TIMEOUT) -> SuiteApiClient:
+    """
+    Gives every request this client sends a timeout, unless the call passes
+    its own. Hooks SuiteApiClient._to_vrops_request (lib 1.1.x), the one
+    place every request goes through, because the SDK sends its own token
+    acquire and release requests and offers no other way to give those a
+    timeout.
+    """
+    to_request = client._to_vrops_request
+
+    def with_timeout(url: str, **kwargs: Any) -> dict:
+        kwargs.setdefault("timeout", timeout)
+        return to_request(url, **kwargs)
+
+    client._to_vrops_request = with_timeout
+    return client
+
+
+@contextmanager
+def session(client: SuiteApiClient) -> Iterator[SuiteApiClient]:
+    """
+    Same as `with client:` (acquire the token on entry, release it on exit),
+    except that a failed release is logged instead of raised: once the reads
+    have succeeded, a release that times out must not throw the collection
+    away. The token then expires on the server.
+    """
+    client.__enter__()
+    try:
+        yield client
+    finally:
+        try:
+            client.__exit__(None, None, None)
+        except Exception as e:  # noqa: BLE001
+            logger.warning(f"Could not release the Suite API token: {e!r}")
 
 
 def fetch_resources(

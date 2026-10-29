@@ -36,8 +36,10 @@ from constants_shared import PARAM_MONSTER_VM_THRESHOLD_PCT
 from constants_shared import RESOURCE_KIND_CLUSTER
 from constants_shared import RESOURCE_KIND_HOST
 from constants_shared import VMWARE_ADAPTER_KIND
+from suite_api import apply_request_timeout
 from suite_api import fetch_resource_keys
 from suite_api import fetch_resources
+from suite_api import session
 from traversal import collect_cluster_and_host_metrics
 
 logger = logging.getLogger(__name__)
@@ -113,8 +115,9 @@ def collect(adapter_instance: AdapterInstance) -> CollectResult:
             )
             monster_vm_threshold_pct = DEFAULT_MONSTER_VM_THRESHOLD_PCT
 
+        apply_request_timeout(client)
         try:
-            with client:
+            with session(client):
                 started = time.monotonic()
                 clusters = fetch_resources(client, RESOURCE_KIND_CLUSTER, VMWARE_ADAPTER_KIND)
                 cluster_keys = fetch_resource_keys(client, RESOURCE_KIND_CLUSTER, VMWARE_ADAPTER_KIND)
