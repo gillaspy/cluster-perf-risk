@@ -32,6 +32,20 @@ Both objects also get `Performance Risk|Composite|Risk Score` (0-100) and
 Formulas, thresholds and the composite score are in
 [docs/METRICS.md](docs/METRICS.md).
 
+## When collection fails
+
+Since 2.0.4 a failed collection is visible on the adapter instance instead of
+looking like a healthy one with no data:
+
+- **Total failure** puts the adapter instance in an error state, with the
+  reason: the resource inventory query failed, every cluster failed, or every
+  stats call failed (for example, the token was rejected). Nothing is written
+  that cycle.
+- **Partial failure** (some clusters, or some Suite API calls) is logged as a
+  warning listing what failed. Everything that did collect is still written; a
+  value whose call failed has no data that cycle, never a guess.
+- Every cycle logs, at INFO, `Suite API: <n> calls, <f> failed, <s>s`.
+
 ## License
 
 Copyright 2026 Tom Gillaspy. Licensed under the [Apache License, Version 2.0](LICENSE); see `NOTICE`.
