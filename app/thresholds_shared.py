@@ -23,7 +23,8 @@ BAND_BOUNDS = {
     METRIC_WORST_VCPU_READY: {"green_max": 4, "yellow_max": 8, "orange_max": 16},
     METRIC_P90_VCPU_READY: {"green_max": 1, "yellow_max": 2, "orange_max": 4},
     METRIC_WORST_VCPU_COSTOP: {"green_max": 2, "yellow_max": 4, "orange_max": 8},
-    METRIC_P90_VCPU_COSTOP: {"green_max": 1, "yellow_max": 2, "orange_max": 4},
+    # 2.1.0: 1/2/4 -> 0.5/1/2.
+    METRIC_P90_VCPU_COSTOP: {"green_max": 0.5, "yellow_max": 1, "orange_max": 2},
     # Memory Contention substituted for the originally-proposed Memory Latency
     # (mem|latency_average is not monitored on this instance) -- see
     # constants_shared.py. Reused the same bounds since it fills the same slot

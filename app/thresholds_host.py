@@ -19,15 +19,17 @@ BAND_BOUNDS = {
     HOST_METRIC_CPU_THREAD_UTILIZATION: {"green_max": 60, "yellow_max": 80, "orange_max": 90},
     HOST_METRIC_MEMORY_CONSUMED: {"green_max": 80, "yellow_max": 90, "orange_max": 95},
     HOST_METRIC_MEMORY_BALLOONED: {"green_max": 1, "yellow_max": 2, "orange_max": 4},
-    HOST_METRIC_CPU_RESERVATION: {"green_max": 40, "yellow_max": 60, "orange_max": 80},
-    HOST_METRIC_MEMORY_RESERVATION: {"green_max": 40, "yellow_max": 60, "orange_max": 80},
+    # 2.1.0: 40/60/80 -> 10/40/60.
+    HOST_METRIC_CPU_RESERVATION: {"green_max": 10, "yellow_max": 40, "orange_max": 60},
+    HOST_METRIC_MEMORY_RESERVATION: {"green_max": 10, "yellow_max": 40, "orange_max": 60},
     # DERIVED, not native -- see constants_host.py
     # (cpu|vcpus_to_cores_allocation_ratio /
     # mem|virtual_to_physical_memory_allocation_ratio confirmed absent from
     # the HostSystem catalog). Confirmed live: values ranged 0.5-1.56 (cpu)
     # and 0.15-0.51 (mem) across 6 real hosts, all landing green/yellow.
     HOST_METRIC_CPU_OVERCOMMIT_RATIO: {"green_max": 1, "yellow_max": 2, "orange_max": 3},
-    HOST_METRIC_MEMORY_OVERCOMMIT_RATIO: {"green_max": 1, "yellow_max": 1.4, "orange_max": 1.6},
+    # 2.1.0: orange_max 1.6 -> 1.8.
+    HOST_METRIC_MEMORY_OVERCOMMIT_RATIO: {"green_max": 1, "yellow_max": 1.4, "orange_max": 1.8},
     HOST_METRIC_MONSTER_VM_COUNT: {"green_max": 0, "yellow_max": 1, "orange_max": 2},
 }
 
