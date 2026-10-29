@@ -56,13 +56,13 @@ def run_collect(keys=True, fail_cluster=None):
     def traverse(client, cluster_id, thr):
         return {}, [("h-uuid-1", "esx01", dict(hm))] if cluster_id == "c-uuid-1" else [("h-uuid-2", "esx02", dict(hm))]
 
-    def keys_for(client, kind, adapter_kind):
-        if not keys:
-            return {}
-        return CLUSTER_KEYS if kind == "ClusterComputeResource" else HOST_KEYS
+    # keys=False: the query returns resourceKeys the projection cannot use.
+    cluster_keys = CLUSTER_KEYS if keys else {cid: {"name": name} for cid, name in CLUSTERS}
+    cycle = mock.Mock()
+    cycle.host_key.side_effect = lambda host_id: HOST_KEYS.get(host_id) if keys else None
 
-    with mock.patch.object(adapter, "fetch_resources", return_value=CLUSTERS), \
-         mock.patch.object(adapter, "fetch_resource_keys", side_effect=keys_for), \
+    with mock.patch.object(adapter, "fetch_resources", return_value=cluster_keys), \
+         mock.patch.object(adapter.snapshot, "read", return_value=cycle), \
          mock.patch.object(adapter.cluster, "gather_metric_values", side_effect=gather), \
          mock.patch.object(adapter, "collect_cluster_and_host_metrics", side_effect=traverse):
         return adapter.collect(FakeInstance())

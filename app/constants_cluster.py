@@ -103,8 +103,8 @@ NATIVE_STATKEY_MAP = {
 # too). Replaced 2026-08-17 with a derived calculation using two host-level
 # inputs: net|usage_average (a real stat, KBps) and config|network|linkspeed
 # (a RESOURCE PROPERTY, not a stat -- fetched via a different endpoint,
-# /api/resources/{id}/properties, not /stats/latest; comes back as a string,
-# e.g. "10000.0" for 10Gbps). Computed per host as
+# /api/resources/properties/latest/query, not the stats query; may come back
+# as a string, e.g. "10000.0" for 10Gbps, or a number). Computed per host as
 # (usage_average_KBps * 8 / 1000) / linkspeed_Mbps * 100, then max across the
 # cluster's hosts -- same "highest across hosts" pattern as other host-raw
 # metrics. Confirmed live: real values landed at 0.13%-0.93% across 6 hosts,

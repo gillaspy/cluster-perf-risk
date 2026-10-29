@@ -20,6 +20,7 @@ import cluster
 import host
 import log_filter
 import native_projection
+import snapshot
 from aria.ops.adapter_instance import AdapterInstance
 from aria.ops.definition.adapter_definition import AdapterDefinition
 from aria.ops.result import CollectResult
@@ -34,10 +35,8 @@ from constants_shared import ADAPTER_NAME
 from constants_shared import DEFAULT_MONSTER_VM_THRESHOLD_PCT
 from constants_shared import PARAM_MONSTER_VM_THRESHOLD_PCT
 from constants_shared import RESOURCE_KIND_CLUSTER
-from constants_shared import RESOURCE_KIND_HOST
 from constants_shared import VMWARE_ADAPTER_KIND
 from suite_api import apply_request_timeout
-from suite_api import fetch_resource_keys
 from suite_api import fetch_resources
 from suite_api import session
 from suite_api import SuiteApiError
@@ -128,9 +127,11 @@ def collect(adapter_instance: AdapterInstance) -> CollectResult:
                     )
                     return result
                 started = time.monotonic()
-                clusters = fetch_resources(client, RESOURCE_KIND_CLUSTER, VMWARE_ADAPTER_KIND)
-                cluster_keys = fetch_resource_keys(client, RESOURCE_KIND_CLUSTER, VMWARE_ADAPTER_KIND)
-                host_keys = fetch_resource_keys(client, RESOURCE_KIND_HOST, VMWARE_ADAPTER_KIND)
+                cluster_keys = fetch_resources(client, RESOURCE_KIND_CLUSTER, VMWARE_ADAPTER_KIND)
+                clusters = [(cluster_id, key["name"]) for cluster_id, key in cluster_keys.items()]
+                # Every host, VM, stat and property the scoring needs, in a
+                # handful of bulk calls. A failed read fails the collection.
+                cycle = snapshot.read(client, list(cluster_keys))
                 clusters_with_hosts = 0
                 clusters_projected = 0
                 total_hosts = 0
@@ -146,9 +147,9 @@ def collect(adapter_instance: AdapterInstance) -> CollectResult:
                 for cluster_id, cluster_name in clusters:
                     # One cluster failing must never lose the others.
                     try:
-                        metric_values = cluster.gather_metric_values(client, cluster_id)
+                        metric_values = cluster.gather_metric_values(cycle, cluster_id)
                         cluster_vm_metrics, host_records = collect_cluster_and_host_metrics(
-                            client, cluster_id, monster_vm_threshold_pct
+                            cycle, cluster_id, monster_vm_threshold_pct
                         )
                         metric_values.update(cluster_vm_metrics)
                         total_hosts += len(host_records)
@@ -173,7 +174,7 @@ def collect(adapter_instance: AdapterInstance) -> CollectResult:
 
                         for host_id, host_name, host_metric_values in host_records:
                             hn = native_projection.project(
-                                result, host_keys.get(host_id), host_metric_values,
+                                result, cycle.host_key(host_id), host_metric_values,
                                 host.score(host_metric_values), HOST_PROJECTION,
                             )
                             if hn:
