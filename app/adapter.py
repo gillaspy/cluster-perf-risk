@@ -18,6 +18,7 @@ from typing import List
 import aria.ops.adapter_logging as logging
 import cluster
 import host
+import log_filter
 import native_projection
 from aria.ops.adapter_instance import AdapterInstance
 from aria.ops.definition.adapter_definition import AdapterDefinition
@@ -195,6 +196,7 @@ def get_endpoints(adapter_instance: AdapterInstance) -> EndpointResult:
 def main(argv: List[str]) -> None:
     logging.setup_logging("adapter.log")
     logging.rotate()
+    log_filter.install()
     logger.info(f"Running adapter code with arguments: {argv}")
     if len(argv) != 3:
         logger.error("Arguments must be <method> <inputfile> <ouputfile>")
