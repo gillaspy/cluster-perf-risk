@@ -108,6 +108,18 @@ def _query_resources(client: SuiteApiClient, resource_kind: str, adapter_kind: s
             return entries
 
 
+def check_access(client: SuiteApiClient, resource_kind: str, adapter_kind: str) -> None:
+    """One small query (a single resource of the kind), to prove the account
+    can log in and read. Raises SuiteApiError if it cannot."""
+    url = "/api/resources/query"
+    with client.post(
+        url,
+        params={"page": 0, "pageSize": 1},
+        json={"resourceKind": [resource_kind], "adapterKind": [adapter_kind]},
+    ) as response:
+        _check(response, "POST", url)
+
+
 def fetch_resources(
     client: SuiteApiClient, resource_kind: str, adapter_kind: str
 ) -> dict[str, dict[str, Any]]:

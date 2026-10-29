@@ -14,12 +14,14 @@
 import sys
 import time
 from typing import List
+from typing import Optional
 
 import aria.ops.adapter_logging as logging
 import cluster
 import host
 import log_filter
 import native_projection
+import scoring
 import snapshot
 from aria.ops.adapter_instance import AdapterInstance
 from aria.ops.definition.adapter_definition import AdapterDefinition
@@ -37,6 +39,7 @@ from constants_shared import PARAM_MONSTER_VM_THRESHOLD_PCT
 from constants_shared import RESOURCE_KIND_CLUSTER
 from constants_shared import VMWARE_ADAPTER_KIND
 from suite_api import apply_request_timeout
+from suite_api import check_access
 from suite_api import fetch_resources
 from suite_api import session
 from suite_api import SuiteApiError
@@ -79,13 +82,77 @@ def get_adapter_definition() -> AdapterDefinition:
         return definition
 
 
+MONSTER_VM_THRESHOLD_RANGE = "a number from 1 to 100"
+
+
+def _monster_vm_threshold(value: object) -> Optional[float]:
+    """The Monster VM Threshold as a float, or None when it is not a number
+    from 1 to 100. Above 100 no VM could ever count as a monster, so the
+    monster metrics would read 0, green. Shared by test() and collect()."""
+    try:
+        threshold = float(value)
+    except (TypeError, ValueError):
+        return None
+    return threshold if 1 <= threshold <= 100 else None
+
+
+def _parameter_problems(adapter_instance: AdapterInstance) -> list[str]:
+    problems = []
+    memory_limit = adapter_instance.get_identifier_value("container_memory_limit")
+    try:
+        if int(str(memory_limit)) <= 0:
+            raise ValueError
+    except (TypeError, ValueError):
+        problems.append(f"Adapter Memory Limit (MB) must be a positive whole number, not {memory_limit!r}")
+    threshold = adapter_instance.get_identifier_value(
+        PARAM_MONSTER_VM_THRESHOLD_PCT, str(DEFAULT_MONSTER_VM_THRESHOLD_PCT)
+    )
+    if _monster_vm_threshold(threshold) is None:
+        problems.append(f"Monster VM Threshold (%) must be {MONSTER_VM_THRESHOLD_RANGE}, not {threshold!r}")
+    for scope, scorer in (("cluster", cluster), ("host", host)):
+        problems += [f"{scope} {p}" for p in scoring.table_problems(scorer.BAND_BOUNDS, scorer.WEIGHTS)]
+    return problems
+
+
 def test(adapter_instance: AdapterInstance) -> TestResult:
     with Timer(logger, "Test"):
-        # get_suite_api_client() returns None when called from 'test' -- Suite
-        # API calls only work inside 'collect'. There's no external host or
-        # credential to validate for a self-referential adapter, so success
-        # here just confirms the adapter instance itself was constructed.
-        return TestResult()
+        result = TestResult()
+        problems = _parameter_problems(adapter_instance)
+        if problems:
+            result.with_error("; ".join(problems))
+            return result
+
+        # The SDK documents get_suite_api_client() as None in 'test' (Suite
+        # API calls only work inside 'collect'), so the one real dependency
+        # usually cannot be checked here; the first collection checks it and
+        # fails with the cause. Should a client ever be supplied, use it.
+        client = adapter_instance.get_suite_api_client()
+        if client is None:
+            logger.info(
+                "Test: parameters and thresholds are valid. No Suite API client is "
+                "available during a test, so Suite API access is checked by the "
+                "first collection, not here."
+            )
+            return result
+
+        apply_request_timeout(client)
+        try:
+            with session(client):
+                if not client.token:
+                    result.with_error(
+                        "Could not get a Suite API token from VCF Operations "
+                        f"({client.credential.host}). See adapter.log."
+                    )
+                    return result
+                check_access(client, RESOURCE_KIND_CLUSTER, VMWARE_ADAPTER_KIND)
+            logger.info("Test: parameters, thresholds and Suite API access are valid.")
+        except SuiteApiError as e:
+            logger.exception(e)
+            result.with_error(f"Suite API call failed: {e}")
+        except Exception as e:  # noqa: BLE001
+            logger.exception(e)
+            result.with_error(f"Could not reach the VCF Operations Suite API: {e!r}")
+        return result
 
 
 def collect(adapter_instance: AdapterInstance) -> CollectResult:
@@ -106,12 +173,12 @@ def collect(adapter_instance: AdapterInstance) -> CollectResult:
         threshold_str = adapter_instance.get_identifier_value(
             PARAM_MONSTER_VM_THRESHOLD_PCT, str(DEFAULT_MONSTER_VM_THRESHOLD_PCT)
         )
-        try:
-            monster_vm_threshold_pct = float(threshold_str)
-        except (TypeError, ValueError):
+        monster_vm_threshold_pct = _monster_vm_threshold(threshold_str)
+        if monster_vm_threshold_pct is None:
             logger.warning(
-                f"Invalid {PARAM_MONSTER_VM_THRESHOLD_PCT} value {threshold_str!r}, "
-                f"falling back to default {DEFAULT_MONSTER_VM_THRESHOLD_PCT}"
+                f"Invalid {PARAM_MONSTER_VM_THRESHOLD_PCT} value {threshold_str!r} "
+                f"(must be {MONSTER_VM_THRESHOLD_RANGE}), falling back to the default, "
+                f"{DEFAULT_MONSTER_VM_THRESHOLD_PCT}"
             )
             monster_vm_threshold_pct = DEFAULT_MONSTER_VM_THRESHOLD_PCT
 

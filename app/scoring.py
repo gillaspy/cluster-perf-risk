@@ -77,3 +77,21 @@ def compute_composite(
         composite_band = "green"
 
     return composite, composite_band, per_metric_band
+
+
+def table_problems(band_bounds: dict, weights: dict) -> list[str]:
+    """Problems with a scope's bounds/weights tables: bounds that do not
+    rise green_max <= yellow_max <= orange_max, or a weight that is not
+    positive. Checked by Test Connection; empty when the tables are sound."""
+    problems = []
+    for key, bounds in band_bounds.items():
+        try:
+            ok = bounds["green_max"] <= bounds["yellow_max"] <= bounds["orange_max"]
+        except (KeyError, TypeError):
+            ok = False
+        if not ok:
+            problems.append(f"band bounds for {key} are not ascending green/yellow/orange")
+    for key, weight in weights.items():
+        if not isinstance(weight, (int, float)) or weight <= 0:
+            problems.append(f"weight for {key} is not a positive number")
+    return problems

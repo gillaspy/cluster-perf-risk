@@ -33,6 +33,18 @@ be read, the band is `unknown` and no score is written for that cycle.
 Formulas, thresholds and the composite score are in
 [docs/METRICS.md](docs/METRICS.md).
 
+## Test Connection
+
+Validate (Test Connection) on the adapter account checks the account's
+settings (memory limit, Monster VM Threshold between 1 and 100) and the
+pack's own threshold tables. A collection that finds a Monster VM Threshold
+outside 1 to 100 (for example on an account created before 2.1.0 and never
+re-validated) logs a warning and uses the default, 50. The integration SDK
+gives the adapter no Suite API access during a test, so a green test does
+not prove the pack can read VCF Operations. The first collection does: if
+it cannot log in or read, the account shows a collection error with the
+cause.
+
 ## Removing the pack
 
 The pack writes onto vSphere objects it does not own, and the SDK has no way
