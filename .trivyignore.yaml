@@ -18,6 +18,19 @@ vulnerabilities:
     purls: ["pkg:pypi/msgpack@1.1.2"]
     statement: pip's own vendored copy (pip/_vendor/msgpack); not installed or imported by the adapter.
     expired_at: 2027-01-11
+  # Same vendored msgpack 1.1.2. pip 26.2.2, the newest release, still
+  # vendors 1.1.2 (checked 2026-10-29), so upgrading pip does not clear it.
+  - id: CVE-2026-114613
+    purls: ["pkg:pypi/msgpack@1.1.2"]
+    statement: pip's own vendored copy (pip/_vendor/msgpack); not installed or imported by the adapter.
+    expired_at: 2027-01-11
+  # pip's vendored certifi (pip/_vendor/certifi), still 2026.06.17 in pip
+  # 26.2.2. The adapter's own certifi is pinned to the fixed release in the
+  # Dockerfile.
+  - id: GHSA-6q48-6c7w-9gw2
+    purls: ["pkg:pypi/certifi@2026.6.17"]
+    statement: pip's own vendored copy (pip/_vendor/certifi); the adapter's live certifi is pinned to the fixed release in the Dockerfile.
+    expired_at: 2027-01-11
   - id: CVE-2026-97687
     purls: ["pkg:pypi/urllib3@2.7.0"]
     statement: pip's own vendored copy (pip/_vendor/urllib3); the adapter's live urllib3 (2.8.0) is unaffected.
