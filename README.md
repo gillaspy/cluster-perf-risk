@@ -17,8 +17,10 @@ in the pack's own metric list on the Repository page. Find them here:
 Each metric below is a `Performance Risk|<Group>|<Label>` metric with a matching
 `Performance Risk|<Group>|<Label> Band` property (green, yellow, orange, red,
 or unknown when there is no data).
-Both objects also get `Performance Risk|Composite|Risk Score` (0-100) and
-`Performance Risk|Composite|Risk Band`.
+Both objects also get `Performance Risk|Composite|Risk Score` (0-100),
+`Performance Risk|Composite|Risk Band` (the worst band among the metrics),
+`Performance Risk|Composite|Risk Band Level` (that band as 0 green to 3 red,
+for coloring widgets) and `Performance Risk|Composite|Metrics In Worst Band`.
 
 | Group | Cluster (`ClusterComputeResource`) | Host (`HostSystem`) |
 |---|---|---|
@@ -44,7 +46,7 @@ looking like a healthy one with no data:
 - **Partial failure** (some clusters, or some Suite API calls) is logged as a
   warning listing what failed. Everything that did collect is still written; a
   value whose call failed has no data that cycle, never a guess.
-- Every cycle logs, at INFO, `Suite API: <n> calls, <f> failed, <s>s`.
+- Every cycle logs, at INFO, `Suite API: <n> calls, <f> failed, <s> stale, <t>s`.
 
 ## License
 

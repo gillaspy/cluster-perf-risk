@@ -1,3 +1,45 @@
+# Migrating to 2.1.0
+
+2.1.0 changes how risk is judged, so **some clusters and hosts change color
+after the upgrade** without anything changing in your environment. No metric
+is removed or renamed; the install is an in-place upgrade over 2.0.x.
+
+## What changes color, and why
+- **The composite band is now the worst sub-metric band.** One red
+  sub-metric makes the object red; before, the band came from the score, and
+  one red among greens showed yellow. Expect more objects in yellow, orange
+  and red. The numeric `Risk Score` is calculated as before.
+- **Thresholds changed:** P90 vCPU Co-Stop 1/2/4 -> 0.5/1/2; cluster Max Host
+  Ballooned 1/1.25/2 -> 1/2/4; host Memory Overcommit Ratio 1/1.4/1.6 ->
+  1/1.4/1.8; host CPU and Memory Reservation 40/60/80 -> 10/40/60. See
+  [docs/METRICS.md](docs/METRICS.md#thresholds).
+- **Powered-off VMs no longer count.** Their vCPUs and memory leave the
+  overcommit ratios and monster VM counts, and their last stats leave the
+  worst/P90 contention metrics. Hosts with many powered-off VMs improve.
+- **Old stats are no data.** A stat more than 10 minutes behind the rest
+  shows no value (band `unknown`) instead of its last value.
+- **Host memory is DRAM.** On hosts with memory tiering, ballooned %, memory
+  overcommit and memory monster VMs are now measured against DRAM only, not
+  DRAM + NVMe. On a host whose NVMe tier is 4x its DRAM, memory overcommit
+  rises about 5x. Hosts without tiering are unaffected.
+
+## New attributes
+On clusters and hosts: `Performance Risk|Composite|Risk Band Level` (the band
+as 0 green to 3 red) and `Performance Risk|Composite|Metrics In Worst Band`.
+
+## Your own content
+- **Anything colored by `Risk Score` thresholds** (60/80/90, the old band
+  limits) no longer matches the band: the score ranges of the bands overlap.
+  Color by `Risk Band Level` (1 yellow, 2 orange, 3 red) or use the `Risk
+  Band` property. The shipped "Cluster Performance Risk" dashboard does this
+  already: its heatmap and scoreboard now color by `Risk Band Level`, and
+  the scoreboard shows the level instead of the score. To get the new
+  dashboard, reinstall the pak with "Reset Default Content" ticked, or
+  import it from `content/dashboards/`.
+- **Alerts or symptoms on `Risk Band` or on sub-metric bands** fire more
+  often after the upgrade, for the reasons above.
+- History is not recalculated: values before the upgrade keep the old rules.
+
 # Migrating to 2.0.0
 
 2.0.0 removes the pack's own object types (`cluster_perf_risk`,
