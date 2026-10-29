@@ -157,3 +157,27 @@ def test_dashboard_only_references_native_kinds_and_known_attributes():
     db = d["dashboards"][0]
     ids = {w["id"] for w in db["widgets"]}
     assert all(i["widgetIdProvider"] in ids and i["widgetIdReceiver"] in ids for i in db["widgetInteractions"])
+
+
+def test_unknown_composite_writes_band_but_no_score():
+    import native_projection
+    from aria.ops.result import CollectResult
+
+    result = CollectResult()
+    values = {k: None for k in cn.CLUSTER_PROJECTION}
+    n = native_projection.project(
+        result, CLUSTER_KEYS["c-uuid-1"], values, adapter.cluster.score(values), cn.CLUSTER_PROJECTION
+    )
+    (obj,) = result.get_json()["result"]
+    metrics = {m["key"] for m in obj["metrics"]}
+    props = {p["key"]: p["stringValue"] for p in obj["properties"]}
+    assert cn.COMPOSITE_SCORE_ATTR not in metrics
+    assert props[cn.COMPOSITE_BAND_ATTR] == "unknown"
+    assert n == len(cn.CLUSTER_PROJECTION) + 1
+
+
+def test_known_composite_writes_score_and_band():
+    js = run_collect().get_json()
+    for o in js["result"]:
+        assert cn.COMPOSITE_SCORE_ATTR in {m["key"] for m in o["metrics"]}
+        assert cn.COMPOSITE_BAND_ATTR in {p["key"] for p in o["properties"]}

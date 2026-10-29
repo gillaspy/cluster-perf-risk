@@ -18,7 +18,8 @@ Each metric below is a `Performance Risk|<Group>|<Label>` metric with a matching
 `Performance Risk|<Group>|<Label> Band` property (green, yellow, orange, red,
 or unknown when there is no data).
 Both objects also get `Performance Risk|Composite|Risk Score` (0-100) and
-`Performance Risk|Composite|Risk Band`.
+`Performance Risk|Composite|Risk Band`. When none of an object's inputs could
+be read, the band is `unknown` and no score is written for that cycle.
 
 | Group | Cluster (`ClusterComputeResource`) | Host (`HostSystem`) |
 |---|---|---|
@@ -31,6 +32,16 @@ Both objects also get `Performance Risk|Composite|Risk Score` (0-100) and
 
 Formulas, thresholds and the composite score are in
 [docs/METRICS.md](docs/METRICS.md).
+
+## Removing the pack
+
+The pack writes onto vSphere objects it does not own, and the SDK has no way
+to remove an attribute from them. After you uninstall the pack or delete its
+adapter account, the `Performance Risk` metrics stop, but each
+`... Band` property and the `Risk Band` keep the last value written. A host
+that was `red` then stays `red` in any view, symptom or alert that reads the
+property. Delete or disable anything of yours that reads them when you remove
+the pack.
 
 ## License
 

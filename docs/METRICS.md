@@ -111,8 +111,9 @@ weight tables (shared thresholds from `thresholds_shared.py` merged with
    diluted into invisibility by several green ones.
 6. **Composite band** is then derived from the composite score itself:
    `≥90 → red`, `≥80 → orange`, `≥60 → yellow`, else `green`.
-7. If every sub-metric fails to collect, the composite is reported as
-   `0.0` / `"unknown"` rather than a false "green".
+7. If every sub-metric fails to collect, the composite band is reported as
+   `"unknown"` rather than a false "green", and no Risk Score is written for
+   that cycle (a `0.0` would read as the best possible score).
 
 ---
 

@@ -49,4 +49,5 @@ the Monster VM Threshold.
 ## Rolling back
 Uninstall 2.0.0, install the 1.3.0 pak and recreate the adapter account.
 Attributes already written to native objects remain as history but are no
-longer updated.
+longer updated. The `... Band` and `Risk Band` properties keep their last
+value on the native objects (see "Removing the pack" in the README).

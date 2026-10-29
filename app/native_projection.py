@@ -59,6 +59,10 @@ def project(
     object. `scored` is (composite_score, composite_band, {metric_key: band})
     from cluster.score() / host.score(). Returns the attribute count (0 when
     the native object could not be identified).
+
+    When the composite band is "unknown" (no input could be read) only the
+    band is written: compute_composite() returns 0.0 for the score in that
+    case, and a 0.0 Risk Score would read as the best possible score.
     """
     target = native_object(result, resource_key)
     if target is None:
@@ -74,6 +78,8 @@ def project(
             count += 1
         target.with_property(band_attr(group, label), per_metric_band.get(key, "unknown"))
         count += 1
-    target.with_metric(COMPOSITE_SCORE_ATTR, composite_score)
+    if composite_band != "unknown":
+        target.with_metric(COMPOSITE_SCORE_ATTR, composite_score)
+        count += 1
     target.with_property(COMPOSITE_BAND_ATTR, composite_band)
-    return count + 2
+    return count + 1
