@@ -22,13 +22,13 @@ from constants_cluster import NETWORK_USAGE_AVERAGE_STATKEY
 from constants_cluster import NUMBER_VMOTION_STATKEY
 from constants_cluster import VM_COUNT_PER_HOST_STATKEY
 from constants_shared import MEMORY_BALLOON_KB_STATKEY
-from constants_shared import MEMORY_TOTAL_CAPACITY_KB_STATKEY
 import scoring
 import thresholds_cluster
 import thresholds_shared
 from suite_api import fetch_child_hosts
 from suite_api import get_property
 from suite_api import latest_stat
+from traversal import host_memory_capacity_kb
 
 # Merged so compute_composite() sees both this object type's own bounds/weights
 # and the ones it shares with the host object.
@@ -81,7 +81,7 @@ def _highest_host_stat(client: SuiteApiClient, cluster_id: str, statkey: str) ->
 def _highest_host_ballooned_pct(client: SuiteApiClient, cluster_id: str) -> Optional[float]:
     """
     memory_ballooned_pct has no native percentage statkey. Computed per host as
-    (ballooned KB / total host memory KB) * 100, then the max across hosts in
+    (ballooned KB / host DRAM KB) * 100, then the max across hosts in
     the cluster is returned (matching the matrix's "Highest ESXi ..." framing).
     """
     host_ids = fetch_child_hosts(client, cluster_id)
@@ -89,7 +89,7 @@ def _highest_host_ballooned_pct(client: SuiteApiClient, cluster_id: str) -> Opti
     ratios = []
     for host_id, _host_name in host_ids:
         ballooned_kb = latest_stat(client, host_id, MEMORY_BALLOON_KB_STATKEY)
-        total_kb = latest_stat(client, host_id, MEMORY_TOTAL_CAPACITY_KB_STATKEY)
+        total_kb = host_memory_capacity_kb(client, host_id)
         if ballooned_kb is not None and total_kb:
             ratios.append((ballooned_kb / total_kb) * 100)
 

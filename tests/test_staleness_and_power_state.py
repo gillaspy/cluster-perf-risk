@@ -87,3 +87,15 @@ def test_powered_off_vm_is_excluded_everywhere():
     assert h["host_monster_vm_count"] == 0
     assert cluster["cluster_cpu_monster_vm_ratio"] == 0
     assert cluster["cluster_memory_monster_vm_ratio"] == 0
+
+
+@pytest.mark.parametrize("dram, provisioned, expected", [
+    (48.0, 64.0, 48.0),    # tiered host: DRAM, not DRAM + NVMe
+    (None, 64.0, 64.0),    # no DRAM tier stat: fall back
+    (0.0, 64.0, 64.0),     # DRAM tier stat present but 0: fall back
+    (None, None, None),    # neither: no data, never a guess
+])
+def test_host_memory_is_dram_with_fallback(dram, provisioned, expected):
+    stats = {"mem:DRAM|memory_tier_total_capacity": dram, "mem|host_provisioned": provisioned}
+    with mock.patch.object(traversal, "latest_stat", side_effect=lambda c, r, k: stats[k]):
+        assert traversal.host_memory_capacity_kb(None, "h1") == expected

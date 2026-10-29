@@ -45,6 +45,7 @@ from constants_shared import HOST_CPU_CORES_STATKEY
 from constants_shared import HOST_DROPPED_PACKETS_STATKEY
 from constants_shared import HOST_MEMORY_CONTENTION_STATKEY
 from constants_shared import MEMORY_BALLOON_KB_STATKEY
+from constants_shared import MEMORY_DRAM_CAPACITY_KB_STATKEY
 from constants_shared import MEMORY_TOTAL_CAPACITY_KB_STATKEY
 from constants_shared import METRIC_HOST_DROPPED_PACKETS
 from constants_shared import METRIC_HOST_MEMORY_CONTENTION
@@ -72,6 +73,15 @@ def _percentile(sorted_values: list[float], pct: float) -> float:
     """
     idx = max(0, math.ceil(pct * len(sorted_values)) - 1)
     return sorted_values[idx]
+
+
+def host_memory_capacity_kb(client: SuiteApiClient, host_id: str) -> Optional[float]:
+    """The host's DRAM in KB: the DRAM tier stat, else mem|host_provisioned
+    (see MEMORY_DRAM_CAPACITY_KB_STATKEY). None when neither has a value."""
+    dram_kb = latest_stat(client, host_id, MEMORY_DRAM_CAPACITY_KB_STATKEY)
+    if dram_kb:
+        return dram_kb
+    return latest_stat(client, host_id, MEMORY_TOTAL_CAPACITY_KB_STATKEY)
 
 
 def _worst_p90_into(
@@ -112,7 +122,7 @@ def collect_cluster_and_host_metrics(
 
     for host_id, host_name in host_ids_and_names:
         host_cores = latest_stat(client, host_id, HOST_CPU_CORES_STATKEY)
-        host_mem_kb = latest_stat(client, host_id, MEMORY_TOTAL_CAPACITY_KB_STATKEY)
+        host_mem_kb = host_memory_capacity_kb(client, host_id)
         host_has_capacity_data = bool(host_cores or host_mem_kb)
         if host_has_capacity_data:
             saw_host_capacity_data = True

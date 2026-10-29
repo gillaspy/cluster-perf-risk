@@ -46,9 +46,16 @@ DEFAULT_MONSTER_VM_THRESHOLD_PCT = 50
 CPU_UTILIZATION_STATKEY = "cpu|utilization_average"
 
 # memory_ballooned_pct (cluster) and host_memory_ballooned_pct (host) both derive
-# from these two raw statkeys as (ballooned KB / total host memory KB) * 100 --
-# no native percentage statkey exists for either scope.
+# from these raw statkeys as (ballooned KB / host memory KB) * 100 -- no native
+# percentage statkey exists for either scope.
 MEMORY_BALLOON_KB_STATKEY = "mem|vmmemctl_average"
+# Host memory, the denominator of ballooned %, memory overcommit and the
+# memory monster VM test, is the host's DRAM (KB). On a host with memory
+# tiering, mem|host_provisioned includes the NVMe tier, which VMs do not run
+# in, so a % of it understates the pressure on DRAM. The DRAM tier stat is
+# used when it has a value; mem|host_provisioned (also KB) otherwise, e.g. on
+# versions without memory tiering stats. Neither: the memory rows are no data.
+MEMORY_DRAM_CAPACITY_KB_STATKEY = "mem:DRAM|memory_tier_total_capacity"
 MEMORY_TOTAL_CAPACITY_KB_STATKEY = "mem|host_provisioned"
 
 # Monster VM detection (traversal.py): a VM counts as a CPU (or memory) monster
