@@ -174,3 +174,13 @@ def test_host_memory_is_dram_with_fallback(dram, provisioned, expected):
         stats[("h1", "mem|host_provisioned")] = provisioned
     snap = traversal.ClusterSnapshot("c1", [("h1", "esx01")], {}, stats, {})
     assert traversal.host_memory_capacity_kb(snap, "h1") == expected
+
+
+def test_overcommit_uses_native_allocation_stats_when_present():
+    host = {**HOST_STATS, "cpu|vcpus_allocated_on_all_powered_on_vms": 8,
+            "mem|memory_allocated_on_all_powered_on_vms": 16 * 1024 * 1024}
+    snap, _ = snapshot_with({"vm-on": "Powered On", "vm-off": "Powered Off", "vm-unknown": None}, host)
+    _, hosts = traversal.collect_cluster_and_host_metrics(snap, 50)
+    (_, _, h), = hosts
+    assert h["host_cpu_overcommit_ratio"] == 8 / 16
+    assert h["host_memory_overcommit_ratio"] == 16 / 64

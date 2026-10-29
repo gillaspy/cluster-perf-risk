@@ -7,8 +7,9 @@ Own composite score/band, own BAND_BOUNDS/WEIGHTS entries (see
 thresholds_host.py) -- independently tunable from the cluster composite even
 where numbers currently coincide.
 
-host_cpu_overcommit_ratio / host_memory_overcommit_ratio are DERIVED, not
-native: cpu|vcpus_to_cores_allocation_ratio and
+host_cpu_overcommit_ratio / host_memory_overcommit_ratio have no native ratio
+statkey (their numerators do since 2.1.0, see HOST_VCPUS_ALLOCATED_STATKEY):
+cpu|vcpus_to_cores_allocation_ratio and
 mem|virtual_to_physical_memory_allocation_ratio (used at cluster scope) were
 confirmed ABSENT from the HostSystem statkey catalog entirely (2026-08-17) --
 they only exist on ClusterComputeResource, despite the original handoff
@@ -54,6 +55,14 @@ HOST_MEMORY_USAGE_STATKEY = "mem|usage_average"  # already a %, direct
 HOST_CPU_RESERVED_STATKEY = "cpu|reservedCapacity_average"  # MHz
 HOST_CPU_CAPACITY_STATKEY = "cpu|capacity_provisioned"  # MHz
 HOST_MEMORY_RESERVED_PCT_STATKEY = "mem|reservedCapacityPct"  # already a %, direct
+
+# Native numerators of the host overcommit ratios: vCPUs and memory (KB)
+# allocated to the host's powered-on VMs. Confirmed live 2026-10-29 on all 6
+# lab hosts, equal to the sums over powered-on VMs that traversal.py derives.
+# Used when present; the derived sums remain the fallback. They do not save
+# any calls: per-VM vCPU and memory are still read for the monster VM test.
+HOST_VCPUS_ALLOCATED_STATKEY = "cpu|vcpus_allocated_on_all_powered_on_vms"
+HOST_MEMORY_ALLOCATED_KB_STATKEY = "mem|memory_allocated_on_all_powered_on_vms"
 
 HOST_BAND_PROPERTY_LABELS = {
     f"band_{HOST_METRIC_CPU_THREAD_UTILIZATION}": "CPU Thread Utilization Band",

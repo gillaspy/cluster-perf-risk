@@ -47,8 +47,10 @@ from constants_host import HOST_METRIC_MEMORY_CONSUMED
 from constants_host import HOST_METRIC_MEMORY_OVERCOMMIT_RATIO
 from constants_host import HOST_METRIC_MEMORY_RESERVATION
 from constants_host import HOST_METRIC_MONSTER_VM_COUNT
+from constants_host import HOST_MEMORY_ALLOCATED_KB_STATKEY
 from constants_host import HOST_MEMORY_RESERVED_PCT_STATKEY
 from constants_host import HOST_MEMORY_USAGE_STATKEY
+from constants_host import HOST_VCPUS_ALLOCATED_STATKEY
 from constants_shared import CPU_UTILIZATION_STATKEY
 from constants_shared import HOST_CPU_CORES_STATKEY
 from constants_shared import HOST_DROPPED_PACKETS_STATKEY
@@ -101,6 +103,7 @@ HOST_STATKEYS = sorted(
         CPU_UTILIZATION_STATKEY, HOST_MEMORY_USAGE_STATKEY,
         HOST_MEMORY_RESERVED_PCT_STATKEY, HOST_CPU_RESERVED_STATKEY,
         HOST_CPU_CAPACITY_STATKEY, NETWORK_USAGE_AVERAGE_STATKEY,
+        HOST_VCPUS_ALLOCATED_STATKEY, HOST_MEMORY_ALLOCATED_KB_STATKEY,
     }
 )
 VM_STATKEYS = sorted({VM_NUM_CPU_STATKEY, VM_MEMORY_KB_STATKEY, *VM_LEVEL_STATKEYS.values()})
@@ -278,6 +281,14 @@ def collect_cluster_and_host_metrics(
                 if value is not None:
                     cluster_vm_samples[sample_key].append(value)
                     host_vm_samples[sample_key].append(value)
+
+        # Native allocation stats when present, else the powered-on sums.
+        native_vcpu = snap.stat(host_id, HOST_VCPUS_ALLOCATED_STATKEY)
+        if native_vcpu is not None:
+            host_total_vcpu = native_vcpu
+        native_vmem_kb = snap.stat(host_id, HOST_MEMORY_ALLOCATED_KB_STATKEY)
+        if native_vmem_kb is not None:
+            host_total_vmem_kb = native_vmem_kb
 
         host_metric_values: dict[str, Optional[float]] = {
             HOST_METRIC_CPU_THREAD_UTILIZATION: host_cpu_util,
