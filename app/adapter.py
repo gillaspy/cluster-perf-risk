@@ -35,6 +35,8 @@ from constants_shared import PARAM_MONSTER_VM_THRESHOLD_PCT
 from constants_shared import RESOURCE_KIND_CLUSTER
 from constants_shared import RESOURCE_KIND_HOST
 from constants_shared import VMWARE_ADAPTER_KIND
+from suite_api import CALL_STATS
+from suite_api import SuiteApiError
 from suite_api import fetch_resource_keys
 from suite_api import fetch_resources
 from traversal import collect_cluster_and_host_metrics
@@ -112,17 +114,22 @@ def collect(adapter_instance: AdapterInstance) -> CollectResult:
             )
             monster_vm_threshold_pct = DEFAULT_MONSTER_VM_THRESHOLD_PCT
 
+        CALL_STATS.reset()
         try:
             with client:
                 started = time.monotonic()
                 clusters = fetch_resources(client, RESOURCE_KIND_CLUSTER, VMWARE_ADAPTER_KIND)
                 cluster_keys = fetch_resource_keys(client, RESOURCE_KIND_CLUSTER, VMWARE_ADAPTER_KIND)
                 host_keys = fetch_resource_keys(client, RESOURCE_KIND_HOST, VMWARE_ADAPTER_KIND)
+                # The inventory queries above raise on failure, so every
+                # failure counted from here on is a per-cluster call.
+                inventory_calls = CALL_STATS.calls
                 clusters_with_hosts = 0
                 clusters_projected = 0
                 total_hosts = 0
                 hosts_projected = 0
                 attributes = 0
+                failed_clusters: list[str] = []
                 for cluster_id, cluster_name in clusters:
                     # One cluster failing must never lose the others.
                     try:
@@ -164,6 +171,7 @@ def collect(adapter_instance: AdapterInstance) -> CollectResult:
                                     f"No native HostSystem match for {host_name!r} ({host_id})"
                                 )
                     except Exception as e:  # noqa: BLE001
+                        failed_clusters.append(cluster_name)
                         logger.error(f"Collection failed for cluster {cluster_name!r} ({cluster_id})")
                         logger.exception(e)
 
@@ -175,13 +183,50 @@ def collect(adapter_instance: AdapterInstance) -> CollectResult:
                     f"Native projection: {clusters_projected}/{len(clusters)} clusters, "
                     f"{hosts_projected}/{total_hosts} hosts, {attributes} attributes"
                 )
+                _report_failures(result, len(clusters), failed_clusters, inventory_calls)
 
+        except SuiteApiError as e:
+            logger.error(f"Suite API error: {e}")
+            result.with_error(f"Suite API error: {e}. See the adapter log.")
         except Exception as e:
             logger.error("Unexpected collection error")
             logger.exception(e)
             result.with_error(f"Unexpected collection error: {e!r}")
+        finally:
+            logger.info(CALL_STATS.summary())
 
         return result
+
+
+def _report_failures(
+    result: CollectResult, cluster_count: int, failed_clusters: list[str], inventory_calls: int
+) -> None:
+    """Makes a failed collection visible on the adapter instance. A partial
+    failure is logged and the clusters that did collect are still sent; a
+    total failure, where nothing usable was collected, sets the result's
+    error so the adapter instance shows it instead of a healthy status."""
+    if cluster_count and len(failed_clusters) == cluster_count:
+        result.with_error(
+            f"Collection failed for all {cluster_count} clusters. See the adapter log."
+        )
+    elif CALL_STATS.calls > inventory_calls and CALL_STATS.failures == CALL_STATS.calls - inventory_calls:
+        # Every stats/properties/relationships call failed (e.g. the token was
+        # rejected after the inventory queries). The clusters were "collected"
+        # but every value is no data.
+        result.with_error(
+            f"Every Suite API stats call failed ({CALL_STATS.failures} calls). See the adapter log."
+        )
+    else:
+        if failed_clusters:
+            logger.warning(
+                f"Collection failed for {len(failed_clusters)}/{cluster_count} clusters: "
+                f"{', '.join(repr(n) for n in failed_clusters)}"
+            )
+        if CALL_STATS.failures:
+            logger.warning(
+                f"{CALL_STATS.failures}/{CALL_STATS.calls} Suite API calls failed; "
+                f"the values that depend on them have no data this cycle"
+            )
 
 
 def get_endpoints(adapter_instance: AdapterInstance) -> EndpointResult:
