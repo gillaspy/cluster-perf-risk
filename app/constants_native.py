@@ -93,6 +93,11 @@ HOST_PROJECTION = {
 
 COMPOSITE_SCORE_ATTR = f"{NATIVE_ROOT}|Composite|Risk Score"
 COMPOSITE_BAND_ATTR = f"{NATIVE_ROOT}|Composite|Risk Band"
+# Numeric metrics, both scopes. Band Level is the band as 0-3 (green-red), for
+# dashboard coloring; Metrics In Worst Band counts the known sub-metrics in
+# that band. Neither is published while the band is unknown.
+COMPOSITE_BAND_LEVEL_ATTR = f"{NATIVE_ROOT}|Composite|Risk Band Level"
+COMPOSITE_WORST_COUNT_ATTR = f"{NATIVE_ROOT}|Composite|Metrics In Worst Band"
 
 
 def metric_attr(group: str, label: str) -> str:

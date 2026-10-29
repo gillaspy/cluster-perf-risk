@@ -93,8 +93,9 @@ def test_external_objects_carry_only_prefixed_attributes_and_exact_counts():
         names = [m["key"] for m in o["metrics"]] + [p["key"] for p in o["properties"]]
         assert names and all(n.startswith(cn.NATIVE_ROOT + "|") for n in names)
         assert len(names) == len(set(names))
-        expected = 2 * len(cn.CLUSTER_PROJECTION) + 2 if o["key"]["objectKind"] == "ClusterComputeResource" \
-            else 2 * len(cn.HOST_PROJECTION) + 2
+        # + score, band, band level, metrics in worst band
+        expected = 2 * len(cn.CLUSTER_PROJECTION) + 4 if o["key"]["objectKind"] == "ClusterComputeResource" \
+            else 2 * len(cn.HOST_PROJECTION) + 4
         assert len(names) == expected
         assert not o.get("events")
     cl = next(o for o in js["result"] if o["key"]["name"] == "cl01")
@@ -117,7 +118,8 @@ def all_attr_names():
     for mapping in (cn.CLUSTER_PROJECTION, cn.HOST_PROJECTION):
         for group, label in mapping.values():
             names += [cn.metric_attr(group, label), cn.band_attr(group, label)]
-    names += [cn.COMPOSITE_SCORE_ATTR, cn.COMPOSITE_BAND_ATTR]
+    names += [cn.COMPOSITE_SCORE_ATTR, cn.COMPOSITE_BAND_ATTR,
+              cn.COMPOSITE_BAND_LEVEL_ATTR, cn.COMPOSITE_WORST_COUNT_ATTR]
     return names
 
 
