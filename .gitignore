@@ -1,7 +1,6 @@
 logs
 build
 connections.json
-venv-capacityPublix
 .DS_Store
 __pycache__/
 *.pyc
