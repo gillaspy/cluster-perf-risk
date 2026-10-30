@@ -17,10 +17,14 @@ docs. The adapter, metrics and thresholds are the same as 2.1.0.
   and Risk Score.
 
 ## Getting the new dashboard
-VCF Operations keeps an existing dashboard with the same ID, and some
-versions have no "Reset Default Content" option, so:
+**Delete the old dashboard first.** On the lab (VCF Operations 9.x, which
+has no "Reset Default Content" option), installing the pak over an existing
+"Cluster Performance Risk" left every widget unconfigured: lists showing
+every object, empty scoreboards, an hourglass on each widget title.
+Installing after deleting it worked.
 1. Dashboards > Manage: delete "Cluster Performance Risk" (every copy, if
-   there are several).
+   there are several). Opening it afterwards from Recents or a bookmark
+   shows "Cannot find a dashboard with id ..." until the pak is installed.
 2. Administration > Integrations > Repository: install the 2.1.1 pak with
    "Install the PAK file even if it is already installed". There is no need
    to uninstall first, and the adapter account stays.
