@@ -27,12 +27,12 @@ for coloring widgets) and `Performance Risk|Composite|Metrics In Worst Band`.
 
 | Group | Cluster (`ClusterComputeResource`) | Host (`HostSystem`) |
 |---|---|---|
-| CPU | Max Host Thread Utilization Pct, Overcommit Ratio, Monster VM Ratio | Thread Utilization Pct, Reservation Pct, Overcommit Ratio, Monster VM Count |
-| Memory | Max Host Ballooned Pct, Overcommit Ratio, Monster VM Ratio | Consumed Pct, Ballooned Pct, Reservation Pct, Overcommit Ratio |
+| CPU | Max Host Thread Utilization Pct, Overcommit Ratio, Monster VM Size Ratio | Thread Utilization Pct, Reservation Pct, Overcommit Ratio, Monster VM Size Ratio |
+| Memory | Max Host Ballooned Pct, Overcommit Ratio, Monster VM Size Ratio, Host Zip Swap Pct | Consumed Pct, Ballooned Pct, Reservation Pct, Overcommit Ratio, Monster VM Size Ratio, Host Zip Swap Pct |
 | Storage | Worst Disk Latency Ms, P90 Disk Latency Ms, Max Host Disk IOPS | Worst Disk Latency Ms, P90 Disk Latency Ms |
 | Network | Host Dropped Packets Pct, Max Host Throughput Pct | Host Dropped Packets Pct |
 | Contention | Worst / P90 vCPU Ready Pct, Worst / P90 vCPU Co-Stop Pct, Worst / P90 VM Memory Contention Pct, Host Memory Contention Pct | Same as cluster, from this host's own VMs |
-| Balance | Host CPU Imbalance Pct, DRS CPU Imbalance, vMotion Pct | — |
+| Balance | Host CPU Imbalance Ratio, DRS CPU Imbalance, vMotion Pct | Host CPU Imbalance Ratio |
 
 Formulas, thresholds and the composite score are in
 [docs/METRICS.md](docs/METRICS.md).
