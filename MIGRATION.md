@@ -1,3 +1,43 @@
+# Migrating to 2.1.1
+
+2.1.1 changes only the shipped "Cluster Performance Risk" dashboard and the
+docs. The adapter, metrics and thresholds are the same as 2.1.0.
+
+## What changes on the dashboard
+- **The heatmap is gone.** It stretched its colors over the values on
+  screen, so its colors were relative: in 2.1.0 a yellow cluster could draw
+  green. The 2.0.x heatmap did the same with the score.
+- **Colors come from two scoreboards** with fixed bounds on `Risk Band
+  Level`: 0 green, 1 yellow, 2 orange, 3 red.
+  - **Cluster Risk Band**: every cluster, no selection needed.
+  - **Host Risk Band**: the hosts of the cluster selected in Cluster
+    Metrics.
+- **Cluster Metrics lists every cluster** and drives the two host widgets.
+  Both lists start with Risk Band, Risk Band Level, Metrics In Worst Band
+  and Risk Score.
+
+## Getting the new dashboard
+**Delete the old dashboard first.** On the lab (VCF Operations 9.x, which
+has no "Reset Default Content" option), installing the pak over an existing
+"Cluster Performance Risk" left every widget unconfigured: lists showing
+every object, empty scoreboards, an hourglass on each widget title.
+Installing after deleting it worked.
+1. Dashboards > Manage: delete "Cluster Performance Risk" (every copy, if
+   there are several). Opening it afterwards from Recents or a bookmark
+   shows "Cannot find a dashboard with id ..." until the pak is installed.
+2. Administration > Integrations > Repository: install the 2.1.1 pak with
+   "Install the PAK file even if it is already installed". There is no need
+   to uninstall first, and the adapter account stays.
+3. Integrations > Accounts: if the Cluster Performance Risk account is not
+   collecting after the upgrade, stop and start its collection.
+4. Open the dashboard from Dashboards > All (Recents can point at a deleted
+   copy).
+
+**Do not import this dashboard from a file.** On VCF Operations 9.x an
+imported copy lost every widget's object types and configurations ("Heatmap
+is not configured", lists showing every object), whether the file came from
+this repository or from the UI's own export. Install it with the pak.
+
 # Migrating to 2.1.0
 
 2.1.0 changes how risk is judged, so **some clusters and hosts change color
@@ -31,11 +71,8 @@ as 0 green to 3 red) and `Performance Risk|Composite|Metrics In Worst Band`.
 - **Anything colored by `Risk Score` thresholds** (60/80/90, the old band
   limits) no longer matches the band: the score ranges of the bands overlap.
   Color by `Risk Band Level` (1 yellow, 2 orange, 3 red) or use the `Risk
-  Band` property. The shipped "Cluster Performance Risk" dashboard does this
-  already: its heatmap and scoreboard now color by `Risk Band Level`, and
-  the scoreboard shows the level instead of the score. To get the new
-  dashboard, reinstall the pak with "Reset Default Content" ticked, or
-  import it from `content/dashboards/`.
+  Band` property. The shipped dashboard does this since 2.1.1; see
+  [Migrating to 2.1.1](#migrating-to-211).
 - **Alerts or symptoms on `Risk Band` or on sub-metric bands** fire more
   often after the upgrade, for the reasons above.
 - History is not recalculated: values before the upgrade keep the old rules.
@@ -86,7 +123,8 @@ the Monster VM Threshold.
 8. Open "Cluster Performance Risk" and click a cluster in the Heatmap. If its
    widgets say they are not configured, it is the old copy: delete it, then
    reinstall the 2.0.0 pak with "Install the PAK file even if it is already
-   installed" and "Reset Default Content" ticked.
+   installed" (and "Reset Default Content" ticked, where your version of VCF
+   Operations has that option).
 
 ## Rolling back
 Uninstall 2.0.0, install the 1.3.0 pak and recreate the adapter account.

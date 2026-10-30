@@ -28,168 +28,15 @@
       "widgets": [
         {
           "collapsed": false,
-          "id": "5d4d6cf2-7d5a-47ae-beb2-ea6efa89c9c0",
-          "gridsterCoords": {
-            "w": 4,
-            "x": 1,
-            "h": 6,
-            "y": 1
-          },
-          "type": "Heatmap",
-          "title": "Heatmap",
-          "config": {
-            "mode": "all",
-            "configs": [
-              {
-                "colorBy": {
-                  "metricKey": "Performance Risk|Composite|Risk Band Level",
-                  "value": "Performance Risk|Composite|Risk Band Level"
-                },
-                "focusOnGroups": false,
-                "color": {
-                  "thresholds": {
-                    "values": [
-                      0,
-                      0.5,
-                      0.51,
-                      1.5,
-                      1.51,
-                      2.5,
-                      2.51,
-                      3
-                    ],
-                    "colors": [
-                      "#74B43B",
-                      "#74B43B",
-                      "#ECC33E",
-                      "#ECC33E",
-                      "#F28B30",
-                      "#F28B30",
-                      "#DE3F30",
-                      "#DE3F30"
-                    ]
-                  }
-                },
-                "sizeBy": {
-                  "metricKey": null,
-                  "value": ""
-                },
-                "relationalGrouping": false,
-                "groupBy": {
-                  "resourceKind": "ClusterComputeResource",
-                  "adapterKind": "VMWARE",
-                  "typeId": "resourceKind:id:0_::_",
-                  "id": "004null002006VMWAREClusterComputeResource",
-                  "text": "Cluster Compute Resource",
-                  "type": "resourceKind",
-                  "parentText": "vCenter",
-                  "parentId": "VMWARE"
-                },
-                "attributeKind": {
-                  "value": ""
-                },
-                "thenBy": null,
-                "mode": {
-                  "mode": false
-                },
-                "resourceKind": "resourceKind:id:0_::_",
-                "filterMode": "tagPicker",
-                "solidColoring": false,
-                "name": "Cluster Composite Risk"
-              },
-              {
-                "colorBy": {
-                  "metricKey": "Performance Risk|Composite|Risk Band Level",
-                  "value": "Performance Risk|Composite|Risk Band Level"
-                },
-                "focusOnGroups": true,
-                "color": {
-                  "thresholds": {
-                    "values": [
-                      0,
-                      0.5,
-                      0.51,
-                      1.5,
-                      1.51,
-                      2.5,
-                      2.51,
-                      3
-                    ],
-                    "colors": [
-                      "#74B43B",
-                      "#74B43B",
-                      "#ECC33E",
-                      "#ECC33E",
-                      "#F28B30",
-                      "#F28B30",
-                      "#DE3F30",
-                      "#DE3F30"
-                    ]
-                  }
-                },
-                "sizeBy": {
-                  "metricKey": null,
-                  "value": ""
-                },
-                "relationalGrouping": false,
-                "groupBy": {
-                  "resourceKind": "HostSystem",
-                  "adapterKind": "VMWARE",
-                  "typeId": "resourceKind:id:1_::_",
-                  "id": "004null002006VMWAREHostSystem",
-                  "text": "Host System",
-                  "type": "resourceKind",
-                  "parentText": "vCenter",
-                  "parentId": "VMWARE"
-                },
-                "attributeKind": {
-                  "value": ""
-                },
-                "thenBy": null,
-                "mode": {
-                  "mode": false
-                },
-                "resourceKind": "resourceKind:id:1_::_",
-                "filterMode": "tagPicker",
-                "tagFilter": null,
-                "solidColoring": false,
-                "name": "Host Composite Risk",
-                "customFilter": null,
-                "id": "extModel1887-1"
-              }
-            ],
-            "depth": 10,
-            "refreshInterval": 300,
-            "resource": [],
-            "refreshContent": {
-              "refreshContent": false
-            },
-            "relationshipMode": {
-              "relationshipMode": [
-                1,
-                -1,
-                0
-              ]
-            },
-            "selfProvider": {
-              "selfProvider": true
-            },
-            "title": "Heatmap",
-            "value": 0
-          },
-          "height": 324
-        },
-        {
-          "collapsed": false,
           "id": "4f6aed3e-fd04-4bfd-a863-dae0fceda185",
           "gridsterCoords": {
-            "w": 7,
-            "x": 5,
-            "h": 6,
+            "w": 11,
+            "x": 1,
+            "h": 3,
             "y": 1
           },
           "type": "Scoreboard",
-          "title": "Performance Risk %",
+          "title": "Cluster Risk Band",
           "config": {
             "maxCellCount": 100,
             "oldMetricValues": false,
@@ -197,7 +44,7 @@
               "relationshipMode": 0
             },
             "valueSize": 24,
-            "title": "Performance Risk Band",
+            "title": "Cluster Risk Band",
             "boxHeight": null,
             "showResourceName": {
               "showResourceName": true
@@ -213,7 +60,7 @@
               "includedResources": null
             },
             "selfProvider": {
-              "selfProvider": false
+              "selfProvider": true
             },
             "resInteractionMode": null,
             "visualTheme": 3,
@@ -253,24 +100,6 @@
                   "redBound": 3,
                   "id": "extModel2065-1",
                   "colorMethod": 0
-                },
-                {
-                  "yellowBound": 1,
-                  "metricUnitId": null,
-                  "metricName": "Risk Band Level",
-                  "metricKey": "Performance Risk|Composite|Risk Band Level",
-                  "handleOldColoring": false,
-                  "maxValue": "",
-                  "link": "",
-                  "resourceKindName": "Host System",
-                  "isStringMetric": false,
-                  "resourceKindId": "resourceKind:id:1_::_",
-                  "label": "Host Risk Band",
-                  "orangeBound": 2,
-                  "unit": "",
-                  "redBound": 3,
-                  "id": "extModel3100-1",
-                  "colorMethod": 0
                 }
               ]
             },
@@ -280,7 +109,7 @@
             "boxColumns": 4,
             "periodLength": null
           },
-          "height": 324
+          "height": 162
         },
         {
           "collapsed": false,
@@ -289,7 +118,7 @@
             "w": 11,
             "x": 1,
             "h": 6,
-            "y": 7
+            "y": 4
           },
           "type": "ResourceList",
           "title": "Cluster Metrics",
@@ -304,6 +133,24 @@
             },
             "title": "Cluster Metrics",
             "additionalColumns": [
+              {
+                "boxLabel": "",
+                "metricName": "Risk Band",
+                "metricKey": "Performance Risk|Composite|Risk Band",
+                "resourceKindId": "resourceKind:id:0_::_"
+              },
+              {
+                "boxLabel": "",
+                "metricName": "Risk Band Level",
+                "metricKey": "Performance Risk|Composite|Risk Band Level",
+                "resourceKindId": "resourceKind:id:0_::_"
+              },
+              {
+                "boxLabel": "",
+                "metricName": "Metrics In Worst Band",
+                "metricKey": "Performance Risk|Composite|Metrics In Worst Band",
+                "resourceKindId": "resourceKind:id:0_::_"
+              },
               {
                 "boxLabel": "",
                 "metricName": "Risk Score",
@@ -390,13 +237,98 @@
               "includedResources": null
             },
             "selectFirstRow": {
-              "selectFirstRow": false
+              "selectFirstRow": true
+            },
+            "selfProvider": {
+              "selfProvider": true
+            }
+          },
+          "height": 324
+        },
+        {
+          "collapsed": false,
+          "id": "b7e0c3f2-5a1d-4e8b-9c6a-2f4d8e1a7b35",
+          "gridsterCoords": {
+            "w": 11,
+            "x": 1,
+            "h": 3,
+            "y": 10
+          },
+          "type": "Scoreboard",
+          "title": "Host Risk Band",
+          "config": {
+            "maxCellCount": 100,
+            "oldMetricValues": false,
+            "relationshipMode": {
+              "relationshipMode": -1
+            },
+            "valueSize": 24,
+            "title": "Host Risk Band",
+            "boxHeight": null,
+            "showResourceName": {
+              "showResourceName": true
+            },
+            "roundDecimals": null,
+            "mode": {
+              "layoutMode": "fixedView"
+            },
+            "labelSize": 16,
+            "customFilter": {
+              "filter": [],
+              "excludedResources": null,
+              "includedResources": null
             },
             "selfProvider": {
               "selfProvider": false
-            }
+            },
+            "resInteractionMode": null,
+            "visualTheme": 3,
+            "showMetricName": {
+              "showMetricName": false
+            },
+            "refreshInterval": 300,
+            "resource": [],
+            "showDT": {
+              "showDT": true
+            },
+            "refreshContent": {
+              "refreshContent": false
+            },
+            "showMetricUnit": {
+              "showMetricUnit": true
+            },
+            "depth": 1,
+            "metric": {
+              "mode": "resourceKind",
+              "resourceMetrics": [],
+              "resourceKindMetrics": [
+                {
+                  "yellowBound": 1,
+                  "metricUnitId": null,
+                  "metricName": "Risk Band Level",
+                  "metricKey": "Performance Risk|Composite|Risk Band Level",
+                  "handleOldColoring": false,
+                  "maxValue": "",
+                  "link": "",
+                  "resourceKindName": "Host System",
+                  "isStringMetric": false,
+                  "resourceKindId": "resourceKind:id:1_::_",
+                  "label": "Host Risk Band",
+                  "orangeBound": 2,
+                  "unit": "",
+                  "redBound": 3,
+                  "id": "extModel3100-1",
+                  "colorMethod": 0
+                }
+              ]
+            },
+            "showSparkline": {
+              "showSparkline": false
+            },
+            "boxColumns": 4,
+            "periodLength": null
           },
-          "height": 323
+          "height": 162
         },
         {
           "collapsed": false,
@@ -420,6 +352,24 @@
             },
             "title": "Hosts in Cluster",
             "additionalColumns": [
+              {
+                "boxLabel": "",
+                "metricName": "Risk Band",
+                "metricKey": "Performance Risk|Composite|Risk Band",
+                "resourceKindId": "resourceKind:id:1_::_"
+              },
+              {
+                "boxLabel": "",
+                "metricName": "Risk Band Level",
+                "metricKey": "Performance Risk|Composite|Risk Band Level",
+                "resourceKindId": "resourceKind:id:1_::_"
+              },
+              {
+                "boxLabel": "",
+                "metricName": "Metrics In Worst Band",
+                "metricKey": "Performance Risk|Composite|Metrics In Worst Band",
+                "resourceKindId": "resourceKind:id:1_::_"
+              },
               {
                 "boxLabel": "",
                 "metricName": "Risk Score",
@@ -590,19 +540,9 @@
           "widgetIdReceiver": "d879962d-f75a-4186-96b9-5a2bdb010c4c"
         },
         {
-          "widgetIdProvider": "5d4d6cf2-7d5a-47ae-beb2-ea6efa89c9c0",
+          "widgetIdProvider": "7c947f71-3d11-4fb9-b59e-87f75a83337a",
           "type": "resourceId",
-          "widgetIdReceiver": "d879962d-f75a-4186-96b9-5a2bdb010c4c"
-        },
-        {
-          "widgetIdProvider": "5d4d6cf2-7d5a-47ae-beb2-ea6efa89c9c0",
-          "type": "resourceId",
-          "widgetIdReceiver": "4f6aed3e-fd04-4bfd-a863-dae0fceda185"
-        },
-        {
-          "widgetIdProvider": "5d4d6cf2-7d5a-47ae-beb2-ea6efa89c9c0",
-          "type": "resourceId",
-          "widgetIdReceiver": "7c947f71-3d11-4fb9-b59e-87f75a83337a"
+          "widgetIdReceiver": "b7e0c3f2-5a1d-4e8b-9c6a-2f4d8e1a7b35"
         }
       ],
       "lastUpdateUserId": "6ab7f0de-a4df-4d75-afc0-c2e1a66f781b",

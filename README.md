@@ -12,7 +12,10 @@ in the pack's own metric list on the Repository page. Find them here:
 - **In dashboards, views, super metrics and alerts:** pick Cluster Compute
   Resource or Host System, then the `Performance Risk` group. They are listed
   once the first collection has written them.
-- **Shipped dashboard:** "Cluster Performance Risk".
+- **Shipped dashboard:** "Cluster Performance Risk": a scoreboard of every
+  cluster's band, the cluster list, and the selected cluster's hosts. It is
+  installed with the pak; don't import it from a file (see
+  [MIGRATION.md](MIGRATION.md#migrating-to-211)).
 
 Each metric below is a `Performance Risk|<Group>|<Label>` metric with a matching
 `Performance Risk|<Group>|<Label> Band` property (green, yellow, orange, red,
