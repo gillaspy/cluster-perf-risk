@@ -55,7 +55,10 @@ HOST_METRIC_MONSTER_VM_COUNT = "host_monster_vm_count"
 # True, real data) against ops.vcf.gillaspy.org.
 HOST_MEMORY_USAGE_STATKEY = "mem|usage_average"  # already a %, direct
 HOST_CPU_RESERVED_STATKEY = "cpu|reservedCapacity_average"  # MHz
-HOST_CPU_CAPACITY_STATKEY = "cpu|capacity_provisioned"  # MHz
+# MHz. Since 2.2.0 the CPU capacity available to VMs, not the provisioned
+# total: on the lab totalCapacity is about 60% of capacity_provisioned
+# (24,075 vs 39,925 MHz), so CPU reservation % reads about 1.66x higher.
+HOST_CPU_CAPACITY_STATKEY = "cpu|totalCapacity_average"
 HOST_MEMORY_RESERVED_PCT_STATKEY = "mem|reservedCapacityPct"  # already a %, direct
 
 # Native numerators of the host overcommit ratios: vCPUs and memory (KB)

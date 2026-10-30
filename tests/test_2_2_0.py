@@ -80,3 +80,12 @@ def test_cluster_imbalance_is_the_worst_host():
     snap = traversal.ClusterSnapshot("c1", [("h1", "a"), ("h2", "b")], {}, stats, props)
     cluster, _ = traversal.collect_cluster_and_host_metrics(snap, 50)
     assert cluster["host_cpu_imbalance_ratio"] == pytest.approx(1.6)
+
+
+def test_cpu_reservation_is_against_total_capacity():
+    host = {"cpu|reservedCapacity_average": 6000.0, "cpu|totalCapacity_average": 24000.0,
+            "cpu|capacity_provisioned": 40000.0}
+    snap = traversal.ClusterSnapshot("c1", [("h1", "esx01")], {},
+                                     {("h1", k): v for k, v in host.items() if k != "cpu|capacity_provisioned"}, {})
+    _, ((_, _, h),) = traversal.collect_cluster_and_host_metrics(snap, 50)
+    assert h["host_cpu_reservation_pct"] == 25.0
