@@ -4,6 +4,7 @@ as-is on the host object too (worst/p90 VM metrics, host memory
 contention/dropped packets) live in constants_shared.py instead.
 """
 from constants_shared import CPU_UTILIZATION_STATKEY
+from constants_shared import METRIC_HOST_CPU_IMBALANCE_RATIO
 from constants_shared import METRIC_HOST_DROPPED_PACKETS
 from constants_shared import METRIC_HOST_MEMORY_CONTENTION
 from constants_shared import METRIC_HOST_MEMORY_ZIP_SWAP
@@ -20,17 +21,14 @@ from constants_shared import METRIC_WORST_VCPU_READY
 
 # Metric keys. NOTE: the matrix's two separate imbalance rows ("Highest ESXi
 # CPU Imbalance" and "Cluster CPU Imbalance") are tracked as two distinct
-# metrics. No per-host imbalance statkey exists on the live instance, so
-# METRIC_HOST_CPU_IMBALANCE is a synthetic proxy -- population stdev of
-# cpu|utilization_average across the cluster's hosts, in percentage points --
-# computed in cluster.py's host_cpu_imbalance_pct(), not a real vSphere/DRS
-# statkey. METRIC_CLUSTER_CPU_IMBALANCE remains the real DRS statkey
-# (clusterServices|total_imbalance).
+# metrics. Since 2.2.0 the first is METRIC_HOST_CPU_IMBALANCE_RATIO
+# (constants_shared.py, running threads per running core, worst host); the
+# stdev-across-hosts stand-in it replaces is gone. METRIC_CLUSTER_CPU_IMBALANCE
+# remains the real DRS statkey (clusterServices|total_imbalance).
 METRIC_CPU_THREAD_UTILIZATION = "cpu_thread_utilization_pct"
 METRIC_MEMORY_BALLOONED = "memory_ballooned_pct"
 METRIC_NETWORK_THROUGHPUT = "network_throughput_pct"
 METRIC_DISK_IOPS = "disk_iops"
-METRIC_HOST_CPU_IMBALANCE = "highest_host_cpu_imbalance_pct"
 METRIC_CLUSTER_CPU_IMBALANCE = "cluster_cpu_imbalance"
 METRIC_VMOTION_PCT = "vmotion_pct"
 
@@ -61,7 +59,6 @@ BAND_PROPERTY_LABELS = {
     f"band_{METRIC_CLUSTER_MEMORY_OVERCOMMIT_RATIO}": "Cluster Memory Overcommit Ratio Band",
     f"band_{METRIC_CLUSTER_CPU_MONSTER_VM_RATIO}": "Cluster CPU Monster VM Ratio Band",
     f"band_{METRIC_CLUSTER_MEMORY_MONSTER_VM_RATIO}": "Cluster Memory Monster VM Ratio Band",
-    f"band_{METRIC_HOST_CPU_IMBALANCE}": "Highest ESXi CPU Imbalance Band",
     f"band_{METRIC_CLUSTER_CPU_IMBALANCE}": "Cluster CPU Imbalance Band",
     f"band_{METRIC_VMOTION_PCT}": "vMotion Pct Band",
     f"band_{METRIC_WORST_VCPU_READY}": "Worst vCPU Ready Band",
@@ -75,6 +72,7 @@ BAND_PROPERTY_LABELS = {
     f"band_{METRIC_HOST_MEMORY_CONTENTION}": "Host Memory Contention Band",
     f"band_{METRIC_HOST_DROPPED_PACKETS}": "Host Dropped Packets Band",
     f"band_{METRIC_HOST_MEMORY_ZIP_SWAP}": "Host Zip Swap Band",
+    f"band_{METRIC_HOST_CPU_IMBALANCE_RATIO}": "Host CPU Imbalance Ratio Band",
 }
 
 # Confirmed directly against ops.vcf.gillaspy.org via

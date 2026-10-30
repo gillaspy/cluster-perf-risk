@@ -22,7 +22,6 @@ from constants_cluster import METRIC_CLUSTER_MEMORY_MONSTER_VM_RATIO
 from constants_cluster import METRIC_CLUSTER_MEMORY_OVERCOMMIT_RATIO
 from constants_cluster import METRIC_CPU_THREAD_UTILIZATION
 from constants_cluster import METRIC_DISK_IOPS
-from constants_cluster import METRIC_HOST_CPU_IMBALANCE
 from constants_cluster import METRIC_MEMORY_BALLOONED
 from constants_cluster import METRIC_NETWORK_THROUGHPUT
 from constants_cluster import METRIC_VMOTION_PCT
@@ -34,6 +33,7 @@ from constants_host import HOST_METRIC_MEMORY_CONSUMED
 from constants_host import HOST_METRIC_MEMORY_OVERCOMMIT_RATIO
 from constants_host import HOST_METRIC_MEMORY_RESERVATION
 from constants_host import HOST_METRIC_MONSTER_VM_COUNT
+from constants_shared import METRIC_HOST_CPU_IMBALANCE_RATIO
 from constants_shared import METRIC_HOST_DROPPED_PACKETS
 from constants_shared import METRIC_HOST_MEMORY_CONTENTION
 from constants_shared import METRIC_HOST_MEMORY_ZIP_SWAP
@@ -62,6 +62,7 @@ _SHARED = {
     METRIC_P90_DISK_LATENCY: ("Storage", "P90 Disk Latency Ms"),
     METRIC_HOST_DROPPED_PACKETS: ("Network", "Host Dropped Packets Pct"),
     METRIC_HOST_MEMORY_ZIP_SWAP: ("Memory", "Host Zip Swap Pct"),
+    METRIC_HOST_CPU_IMBALANCE_RATIO: ("Balance", "Host CPU Imbalance Ratio"),
 }
 
 # metric key -> (group, label)
@@ -70,7 +71,6 @@ CLUSTER_PROJECTION = {
     METRIC_CPU_THREAD_UTILIZATION: ("CPU", "Max Host Thread Utilization Pct"),
     METRIC_CLUSTER_CPU_OVERCOMMIT_RATIO: ("CPU", "Overcommit Ratio"),
     METRIC_CLUSTER_CPU_MONSTER_VM_RATIO: ("CPU", "Monster VM Ratio"),
-    METRIC_HOST_CPU_IMBALANCE: ("Balance", "Host CPU Imbalance Pct"),
     METRIC_CLUSTER_CPU_IMBALANCE: ("Balance", "DRS CPU Imbalance"),
     METRIC_VMOTION_PCT: ("Balance", "vMotion Pct"),
     METRIC_MEMORY_BALLOONED: ("Memory", "Max Host Ballooned Pct"),

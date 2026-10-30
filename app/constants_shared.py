@@ -136,5 +136,17 @@ HOST_DROPPED_PACKETS_STATKEY = "net|droppedPct"
 # sys|resourceMemSwapped_latest derivation tried in 2026-08 (see above).
 # Host Memory Contention stays a separate metric.
 METRIC_HOST_MEMORY_ZIP_SWAP = "host_memory_zip_swap_pct"
+
+# Host CPU imbalance, since 2.2.0: running threads per running core.
+#   running threads = cpu|utilization_average % x threads
+#   running cores   = cpu|coreUtilization_average % x cores
+# Threads are 2 x cores when the host properties config|hyperThread|available
+# and |active are both "true", else the cores. 1 means one running thread per
+# running core; above 1, hyper-threads share cores. The cluster value is the
+# worst host. Replaces the stdev-across-hosts stand-in.
+METRIC_HOST_CPU_IMBALANCE_RATIO = "host_cpu_imbalance_ratio"
+HOST_CPU_CORE_UTILIZATION_STATKEY = "cpu|coreUtilization_average"
+HOST_HT_AVAILABLE_PROPERTY = "config|hyperThread|available"
+HOST_HT_ACTIVE_PROPERTY = "config|hyperThread|active"
 MEMORY_COMPRESSED_KB_STATKEY = "mem|compressed_average"
 MEMORY_SWAPOUT_KB_STATKEY = "mem|swapout_average"

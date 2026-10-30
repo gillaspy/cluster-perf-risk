@@ -52,12 +52,16 @@ from constants_host import HOST_MEMORY_RESERVED_PCT_STATKEY
 from constants_host import HOST_MEMORY_USAGE_STATKEY
 from constants_host import HOST_VCPUS_ALLOCATED_STATKEY
 from constants_shared import CPU_UTILIZATION_STATKEY
+from constants_shared import HOST_CPU_CORE_UTILIZATION_STATKEY
 from constants_shared import HOST_CPU_CORES_STATKEY
 from constants_shared import HOST_DROPPED_PACKETS_STATKEY
+from constants_shared import HOST_HT_ACTIVE_PROPERTY
+from constants_shared import HOST_HT_AVAILABLE_PROPERTY
 from constants_shared import HOST_MEMORY_CONTENTION_STATKEY
 from constants_shared import MEMORY_BALLOON_KB_STATKEY
 from constants_shared import MEMORY_DRAM_CAPACITY_KB_STATKEY
 from constants_shared import MEMORY_TOTAL_CAPACITY_KB_STATKEY
+from constants_shared import METRIC_HOST_CPU_IMBALANCE_RATIO
 from constants_shared import METRIC_HOST_DROPPED_PACKETS
 from constants_shared import METRIC_HOST_MEMORY_CONTENTION
 from constants_shared import METRIC_HOST_MEMORY_ZIP_SWAP
@@ -108,10 +112,11 @@ HOST_STATKEYS = sorted(
         HOST_CPU_CAPACITY_STATKEY, NETWORK_USAGE_AVERAGE_STATKEY,
         HOST_VCPUS_ALLOCATED_STATKEY, HOST_MEMORY_ALLOCATED_KB_STATKEY,
         MEMORY_COMPRESSED_KB_STATKEY, MEMORY_SWAPOUT_KB_STATKEY,
+        HOST_CPU_CORE_UTILIZATION_STATKEY,
     }
 )
 VM_STATKEYS = sorted({VM_NUM_CPU_STATKEY, VM_MEMORY_KB_STATKEY, *VM_LEVEL_STATKEYS.values()})
-HOST_PROPERTY_KEYS = [HOST_LINKSPEED_PROPERTY]
+HOST_PROPERTY_KEYS = [HOST_LINKSPEED_PROPERTY, HOST_HT_AVAILABLE_PROPERTY, HOST_HT_ACTIVE_PROPERTY]
 VM_PROPERTY_KEYS = [VM_POWER_STATE_PROPERTY]
 
 
@@ -203,6 +208,26 @@ def host_zip_swap_pct(snap: ClusterSnapshot, host_id: str, host_mem_kb: Optional
     return (compressed_kb + swapout_kb) / host_mem_kb * 100
 
 
+def host_cpu_imbalance_ratio(snap: ClusterSnapshot, host_id: str, host_cores: Optional[float]) -> Optional[float]:
+    """Running threads per running core (see METRIC_HOST_CPU_IMBALANCE_RATIO).
+    An idle host (nothing running) is 1, not imbalanced; any input missing is
+    no data."""
+    thread_util = snap.stat(host_id, CPU_UTILIZATION_STATKEY)
+    core_util = snap.stat(host_id, HOST_CPU_CORE_UTILIZATION_STATKEY)
+    if thread_util is None or core_util is None or not host_cores:
+        return None
+    hyperthreaded = (
+        snap.prop(host_id, HOST_HT_AVAILABLE_PROPERTY) == "true"
+        and snap.prop(host_id, HOST_HT_ACTIVE_PROPERTY) == "true"
+    )
+    threads = host_cores * 2 if hyperthreaded else host_cores
+    running_threads = thread_util / 100 * threads
+    running_cores = core_util / 100 * host_cores
+    if not running_cores:
+        return 1.0 if not running_threads else None
+    return running_threads / running_cores
+
+
 def _worst_p90_into(
     target: dict[str, Optional[float]], samples_by_key: dict[str, list[float]]
 ) -> None:
@@ -237,6 +262,7 @@ def collect_cluster_and_host_metrics(
     host_memory_contention_samples = []
     host_dropped_packets_samples = []
     host_zip_swap_samples = []
+    host_imbalance_samples = []
     host_records: list[tuple[str, str, dict[str, Optional[float]]]] = []
 
     for host_id, host_name in host_ids_and_names:
@@ -256,6 +282,10 @@ def collect_cluster_and_host_metrics(
         host_zip_swap = host_zip_swap_pct(snap, host_id, host_mem_kb)
         if host_zip_swap is not None:
             host_zip_swap_samples.append(host_zip_swap)
+
+        host_imbalance = host_cpu_imbalance_ratio(snap, host_id, host_cores)
+        if host_imbalance is not None:
+            host_imbalance_samples.append(host_imbalance)
 
         host_cpu_util = snap.stat(host_id, CPU_UTILIZATION_STATKEY)
         host_mem_usage = snap.stat(host_id, HOST_MEMORY_USAGE_STATKEY)
@@ -327,6 +357,7 @@ def collect_cluster_and_host_metrics(
             METRIC_HOST_MEMORY_CONTENTION: host_mem_contention,
             METRIC_HOST_DROPPED_PACKETS: host_dropped_pct,
             METRIC_HOST_MEMORY_ZIP_SWAP: host_zip_swap,
+            METRIC_HOST_CPU_IMBALANCE_RATIO: host_imbalance,
         }
         _worst_p90_into(host_metric_values, host_vm_samples)
         host_records.append((host_id, host_name, host_metric_values))
@@ -354,6 +385,9 @@ def collect_cluster_and_host_metrics(
         ),
         METRIC_HOST_MEMORY_ZIP_SWAP: (
             max(host_zip_swap_samples) if host_zip_swap_samples else None
+        ),
+        METRIC_HOST_CPU_IMBALANCE_RATIO: (
+            max(host_imbalance_samples) if host_imbalance_samples else None
         ),
     }
     _worst_p90_into(cluster_results, cluster_vm_samples)

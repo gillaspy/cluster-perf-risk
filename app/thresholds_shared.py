@@ -4,6 +4,7 @@ cluster and host scopes (see constants_shared.py).
 """
 from __future__ import annotations
 
+from constants_shared import METRIC_HOST_CPU_IMBALANCE_RATIO
 from constants_shared import METRIC_HOST_DROPPED_PACKETS
 from constants_shared import METRIC_HOST_MEMORY_CONTENTION
 from constants_shared import METRIC_HOST_MEMORY_ZIP_SWAP
@@ -46,6 +47,10 @@ BAND_BOUNDS = {
     METRIC_HOST_DROPPED_PACKETS: {"green_max": 0, "yellow_max": 0.2, "orange_max": 0.4},
     # 2.2.0, new.
     METRIC_HOST_MEMORY_ZIP_SWAP: {"green_max": 0.25, "yellow_max": 0.5, "orange_max": 1},
+    # 2.2.0, new. Green up to 1.2: on the lab every host ran at 1.05-1.15
+    # with nothing wrong, so green at exactly 1 would have made every object
+    # yellow.
+    METRIC_HOST_CPU_IMBALANCE_RATIO: {"green_max": 1.2, "yellow_max": 1.4, "orange_max": 1.6},
 }
 
 # Monster VM counts weighted higher -- more direct predictor of noisy-neighbor risk
@@ -64,4 +69,5 @@ WEIGHTS = {
     METRIC_HOST_MEMORY_CONTENTION: 0.75,
     METRIC_HOST_DROPPED_PACKETS: 0.75,
     METRIC_HOST_MEMORY_ZIP_SWAP: 1.0,
+    METRIC_HOST_CPU_IMBALANCE_RATIO: 0.75,
 }

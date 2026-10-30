@@ -19,6 +19,7 @@ mirroring the cluster stat's own documented definition ("vCPUs allocated to
 powered on VMs / physical cores") using the exact per-VM data already
 collected in traversal.py's shared VM pass.
 """
+from constants_shared import METRIC_HOST_CPU_IMBALANCE_RATIO
 from constants_shared import METRIC_HOST_DROPPED_PACKETS
 from constants_shared import METRIC_HOST_MEMORY_CONTENTION
 from constants_shared import METRIC_HOST_MEMORY_ZIP_SWAP
@@ -87,4 +88,5 @@ HOST_BAND_PROPERTY_LABELS = {
     f"band_{METRIC_HOST_MEMORY_CONTENTION}": "Host Memory Contention Band",
     f"band_{METRIC_HOST_DROPPED_PACKETS}": "Host Dropped Packets Band",
     f"band_{METRIC_HOST_MEMORY_ZIP_SWAP}": "Host Zip Swap Band",
+    f"band_{METRIC_HOST_CPU_IMBALANCE_RATIO}": "Host CPU Imbalance Ratio Band",
 }
