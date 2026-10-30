@@ -153,8 +153,10 @@ weight tables (shared thresholds from `thresholds_shared.py` merged with
    the bands overlap (green 0, yellow 42-60, orange 56-80, red 63-90), so
    color by the band, not by score thresholds.
 7. **Risk Band Level** is the band as a number: `green 0, yellow 1, orange 2,
-   red 3`. Dashboards color by it (the shipped dashboard's heatmap and
-   scoreboard do), because widgets color by a number, not a string.
+   red 3`. Dashboards color by it, because widgets color by a number, not a
+   string. Use a widget with fixed bounds (the shipped dashboard's
+   scoreboards, 1 yellow, 2 orange, 3 red): a heatmap stretches its colors
+   over the values on screen, so its colors are relative.
 8. **Metrics In Worst Band** is how many known sub-metrics are in that band:
    with a red band, 1 means a single red sub-metric, 4 means four.
 9. If every sub-metric fails to collect, the composite is reported as
