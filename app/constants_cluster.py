@@ -6,6 +6,7 @@ contention/dropped packets) live in constants_shared.py instead.
 from constants_shared import CPU_UTILIZATION_STATKEY
 from constants_shared import METRIC_HOST_DROPPED_PACKETS
 from constants_shared import METRIC_HOST_MEMORY_CONTENTION
+from constants_shared import METRIC_HOST_MEMORY_ZIP_SWAP
 from constants_shared import METRIC_P90_DISK_LATENCY
 from constants_shared import METRIC_P90_MEMORY_CONTENTION
 from constants_shared import METRIC_P90_VCPU_COSTOP
@@ -73,6 +74,7 @@ BAND_PROPERTY_LABELS = {
     f"band_{METRIC_P90_DISK_LATENCY}": "P90 Disk Latency Band",
     f"band_{METRIC_HOST_MEMORY_CONTENTION}": "Host Memory Contention Band",
     f"band_{METRIC_HOST_DROPPED_PACKETS}": "Host Dropped Packets Band",
+    f"band_{METRIC_HOST_MEMORY_ZIP_SWAP}": "Host Zip Swap Band",
 }
 
 # Confirmed directly against ops.vcf.gillaspy.org via

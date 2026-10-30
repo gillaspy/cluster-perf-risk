@@ -16,6 +16,7 @@ SHARED = {
     "p90_disk_latency_ms": (20, 40, 60),
     "host_memory_contention_pct": (0.25, 0.5, 1),
     "host_dropped_packets_pct": (0, 0.2, 0.4),
+    "host_memory_zip_swap_pct": (0.25, 0.5, 1),     # 2.2.0, new
 }
 CLUSTER = {
     "cpu_thread_utilization_pct": (60, 80, 90),

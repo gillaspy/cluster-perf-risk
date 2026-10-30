@@ -36,6 +36,7 @@ from constants_host import HOST_METRIC_MEMORY_RESERVATION
 from constants_host import HOST_METRIC_MONSTER_VM_COUNT
 from constants_shared import METRIC_HOST_DROPPED_PACKETS
 from constants_shared import METRIC_HOST_MEMORY_CONTENTION
+from constants_shared import METRIC_HOST_MEMORY_ZIP_SWAP
 from constants_shared import METRIC_P90_DISK_LATENCY
 from constants_shared import METRIC_P90_MEMORY_CONTENTION
 from constants_shared import METRIC_P90_VCPU_COSTOP
@@ -60,6 +61,7 @@ _SHARED = {
     METRIC_WORST_DISK_LATENCY: ("Storage", "Worst Disk Latency Ms"),
     METRIC_P90_DISK_LATENCY: ("Storage", "P90 Disk Latency Ms"),
     METRIC_HOST_DROPPED_PACKETS: ("Network", "Host Dropped Packets Pct"),
+    METRIC_HOST_MEMORY_ZIP_SWAP: ("Memory", "Host Zip Swap Pct"),
 }
 
 # metric key -> (group, label)

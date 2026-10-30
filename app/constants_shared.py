@@ -129,3 +129,12 @@ METRIC_HOST_MEMORY_CONTENTION = "host_memory_contention_pct"
 METRIC_HOST_DROPPED_PACKETS = "host_dropped_packets_pct"
 HOST_MEMORY_CONTENTION_STATKEY = "mem|host_contentionPct"
 HOST_DROPPED_PACKETS_STATKEY = "net|droppedPct"
+
+# Memory zip swap, since 2.2.0: (compressed KB + swapped-out KB) / host DRAM
+# KB * 100, per host; the cluster value is the worst host. Both stats return
+# data on VCF Operations 9.x (confirmed on the lab 2026-10-30), unlike the
+# sys|resourceMemSwapped_latest derivation tried in 2026-08 (see above).
+# Host Memory Contention stays a separate metric.
+METRIC_HOST_MEMORY_ZIP_SWAP = "host_memory_zip_swap_pct"
+MEMORY_COMPRESSED_KB_STATKEY = "mem|compressed_average"
+MEMORY_SWAPOUT_KB_STATKEY = "mem|swapout_average"

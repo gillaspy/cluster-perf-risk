@@ -60,6 +60,9 @@ from constants_shared import MEMORY_DRAM_CAPACITY_KB_STATKEY
 from constants_shared import MEMORY_TOTAL_CAPACITY_KB_STATKEY
 from constants_shared import METRIC_HOST_DROPPED_PACKETS
 from constants_shared import METRIC_HOST_MEMORY_CONTENTION
+from constants_shared import METRIC_HOST_MEMORY_ZIP_SWAP
+from constants_shared import MEMORY_COMPRESSED_KB_STATKEY
+from constants_shared import MEMORY_SWAPOUT_KB_STATKEY
 from constants_shared import RESOURCE_KIND_VM
 from constants_shared import VM_POWER_STATE_PROPERTY
 from constants_shared import VM_POWERED_ON
@@ -104,6 +107,7 @@ HOST_STATKEYS = sorted(
         HOST_MEMORY_RESERVED_PCT_STATKEY, HOST_CPU_RESERVED_STATKEY,
         HOST_CPU_CAPACITY_STATKEY, NETWORK_USAGE_AVERAGE_STATKEY,
         HOST_VCPUS_ALLOCATED_STATKEY, HOST_MEMORY_ALLOCATED_KB_STATKEY,
+        MEMORY_COMPRESSED_KB_STATKEY, MEMORY_SWAPOUT_KB_STATKEY,
     }
 )
 VM_STATKEYS = sorted({VM_NUM_CPU_STATKEY, VM_MEMORY_KB_STATKEY, *VM_LEVEL_STATKEYS.values()})
@@ -189,6 +193,16 @@ def host_memory_capacity_kb(snap: ClusterSnapshot, host_id: str) -> Optional[flo
     return snap.stat(host_id, MEMORY_TOTAL_CAPACITY_KB_STATKEY)
 
 
+def host_zip_swap_pct(snap: ClusterSnapshot, host_id: str, host_mem_kb: Optional[float]) -> Optional[float]:
+    """(compressed + swapped-out) KB as a % of host DRAM. No data when either
+    stat or the DRAM is missing -- never half a sum."""
+    compressed_kb = snap.stat(host_id, MEMORY_COMPRESSED_KB_STATKEY)
+    swapout_kb = snap.stat(host_id, MEMORY_SWAPOUT_KB_STATKEY)
+    if compressed_kb is None or swapout_kb is None or not host_mem_kb:
+        return None
+    return (compressed_kb + swapout_kb) / host_mem_kb * 100
+
+
 def _worst_p90_into(
     target: dict[str, Optional[float]], samples_by_key: dict[str, list[float]]
 ) -> None:
@@ -222,6 +236,7 @@ def collect_cluster_and_host_metrics(
     cluster_vm_samples: dict[str, list[float]] = {key: [] for key in VM_LEVEL_STATKEYS}
     host_memory_contention_samples = []
     host_dropped_packets_samples = []
+    host_zip_swap_samples = []
     host_records: list[tuple[str, str, dict[str, Optional[float]]]] = []
 
     for host_id, host_name in host_ids_and_names:
@@ -237,6 +252,10 @@ def collect_cluster_and_host_metrics(
         host_dropped_pct = snap.stat(host_id, HOST_DROPPED_PACKETS_STATKEY)
         if host_dropped_pct is not None:
             host_dropped_packets_samples.append(host_dropped_pct)
+
+        host_zip_swap = host_zip_swap_pct(snap, host_id, host_mem_kb)
+        if host_zip_swap is not None:
+            host_zip_swap_samples.append(host_zip_swap)
 
         host_cpu_util = snap.stat(host_id, CPU_UTILIZATION_STATKEY)
         host_mem_usage = snap.stat(host_id, HOST_MEMORY_USAGE_STATKEY)
@@ -307,6 +326,7 @@ def collect_cluster_and_host_metrics(
             ),
             METRIC_HOST_MEMORY_CONTENTION: host_mem_contention,
             METRIC_HOST_DROPPED_PACKETS: host_dropped_pct,
+            METRIC_HOST_MEMORY_ZIP_SWAP: host_zip_swap,
         }
         _worst_p90_into(host_metric_values, host_vm_samples)
         host_records.append((host_id, host_name, host_metric_values))
@@ -331,6 +351,9 @@ def collect_cluster_and_host_metrics(
         ),
         METRIC_HOST_DROPPED_PACKETS: (
             max(host_dropped_packets_samples) if host_dropped_packets_samples else None
+        ),
+        METRIC_HOST_MEMORY_ZIP_SWAP: (
+            max(host_zip_swap_samples) if host_zip_swap_samples else None
         ),
     }
     _worst_p90_into(cluster_results, cluster_vm_samples)

@@ -6,6 +6,7 @@ from __future__ import annotations
 
 from constants_shared import METRIC_HOST_DROPPED_PACKETS
 from constants_shared import METRIC_HOST_MEMORY_CONTENTION
+from constants_shared import METRIC_HOST_MEMORY_ZIP_SWAP
 from constants_shared import METRIC_P90_DISK_LATENCY
 from constants_shared import METRIC_P90_MEMORY_CONTENTION
 from constants_shared import METRIC_P90_VCPU_COSTOP
@@ -43,6 +44,8 @@ BAND_BOUNDS = {
     # constants_shared.py). Exact-zero green confirmed reasonable in practice:
     # live 2026-08-17 measurement was 0.0 on all 3 hosts checked.
     METRIC_HOST_DROPPED_PACKETS: {"green_max": 0, "yellow_max": 0.2, "orange_max": 0.4},
+    # 2.2.0, new.
+    METRIC_HOST_MEMORY_ZIP_SWAP: {"green_max": 0.25, "yellow_max": 0.5, "orange_max": 1},
 }
 
 # Monster VM counts weighted higher -- more direct predictor of noisy-neighbor risk
@@ -60,4 +63,5 @@ WEIGHTS = {
     METRIC_P90_DISK_LATENCY: 0.75,
     METRIC_HOST_MEMORY_CONTENTION: 0.75,
     METRIC_HOST_DROPPED_PACKETS: 0.75,
+    METRIC_HOST_MEMORY_ZIP_SWAP: 1.0,
 }
