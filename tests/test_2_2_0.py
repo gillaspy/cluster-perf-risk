@@ -31,14 +31,14 @@ def test_zip_swap_is_compressed_plus_swapped_over_dram(compressed, swapout, expe
         host["mem|compressed_average"] = compressed
     if swapout is not None:
         host["mem|swapout_average"] = swapout
-    cluster, ((_, _, h),) = traversal.collect_cluster_and_host_metrics(snapshot(host), 50)
+    cluster, ((_, _, h),) = traversal.collect_cluster_and_host_metrics(snapshot(host))
     assert h["host_memory_zip_swap_pct"] == expected
     assert cluster["host_memory_zip_swap_pct"] == expected
 
 
 def test_zip_swap_without_dram_is_no_data():
     snap = snapshot({"mem|compressed_average": 1.0, "mem|swapout_average": 1.0})
-    _, ((_, _, h),) = traversal.collect_cluster_and_host_metrics(snap, 50)
+    _, ((_, _, h),) = traversal.collect_cluster_and_host_metrics(snap)
     assert h["host_memory_zip_swap_pct"] is None
 
 
@@ -47,7 +47,7 @@ def imbalance(thread_util, core_util, ht=("true", "true"), cores=16):
             "hardware|cpuInfo|num_CpuCores": cores}
     host = {k: v for k, v in host.items() if v is not None}
     props = {"config|hyperThread|available": ht[0], "config|hyperThread|active": ht[1]}
-    cluster, ((_, _, h),) = traversal.collect_cluster_and_host_metrics(snapshot(host, host_props=props), 50)
+    cluster, ((_, _, h),) = traversal.collect_cluster_and_host_metrics(snapshot(host, host_props=props))
     assert cluster["host_cpu_imbalance_ratio"] == h["host_cpu_imbalance_ratio"]
     return h["host_cpu_imbalance_ratio"]
 
@@ -78,7 +78,7 @@ def test_cluster_imbalance_is_the_worst_host():
                       (h, "hardware|cpuInfo|num_CpuCores"): 16})
     props = {(h, k): "true" for h in ("h1", "h2") for k in ("config|hyperThread|available", "config|hyperThread|active")}
     snap = traversal.ClusterSnapshot("c1", [("h1", "a"), ("h2", "b")], {}, stats, props)
-    cluster, _ = traversal.collect_cluster_and_host_metrics(snap, 50)
+    cluster, _ = traversal.collect_cluster_and_host_metrics(snap)
     assert cluster["host_cpu_imbalance_ratio"] == pytest.approx(1.6)
 
 
@@ -87,5 +87,65 @@ def test_cpu_reservation_is_against_total_capacity():
             "cpu|capacity_provisioned": 40000.0}
     snap = traversal.ClusterSnapshot("c1", [("h1", "esx01")], {},
                                      {("h1", k): v for k, v in host.items() if k != "cpu|capacity_provisioned"}, {})
-    _, ((_, _, h),) = traversal.collect_cluster_and_host_metrics(snap, 50)
+    _, ((_, _, h),) = traversal.collect_cluster_and_host_metrics(snap)
     assert h["host_cpu_reservation_pct"] == 25.0
+
+
+def monster(host_cores=64, dram_gb=768.0, vms=(), settings=traversal.MonsterVmSettings()):
+    host = {"hardware|cpuInfo|num_CpuCores": host_cores,
+            "mem:DRAM|memory_tier_total_capacity": None if dram_gb is None else dram_gb * KB_PER_GB}
+    host = {k: v for k, v in host.items() if v is not None}
+    vm_stats = {f"vm{i}": {"config|hardware|num_Cpu": c, "mem|guest_provisioned": m * KB_PER_GB}
+                for i, (c, m) in enumerate(vms)}
+    cluster, ((_, _, h),) = traversal.collect_cluster_and_host_metrics(snapshot(host, vm_stats), settings)
+    assert cluster["cpu_monster_vm_size_ratio"] == h["cpu_monster_vm_size_ratio"]
+    assert cluster["memory_monster_vm_size_ratio"] == h["memory_monster_vm_size_ratio"]
+    return h["cpu_monster_vm_size_ratio"], h["memory_monster_vm_size_ratio"]
+
+
+def test_monster_ratio_is_largest_vm_over_monster_size():
+    # 64 cores -> CPU monster above 32 vCPU. 768 GB DRAM -> 40% is 307.2 GB,
+    # capped at 256 GB.
+    cpu, mem = monster(vms=[(16, 64), (48, 128)])
+    assert cpu == 48 / 32
+    assert mem == 128 / 256
+
+
+def test_monster_memory_uses_40_percent_below_the_cap():
+    _, mem = monster(dram_gb=512, vms=[(4, 204.8)])
+    assert mem == pytest.approx(1.0)   # 40% of 512 GB = 204.8 GB, below 256
+
+
+def test_monster_settings_apply():
+    s = traversal.MonsterVmSettings(cpu_pct=25, memory_pct=10, memory_cap_gb=1000)
+    cpu, mem = monster(vms=[(16, 76.8)], settings=s)
+    assert cpu == 16 / 16
+    assert mem == pytest.approx(1.0)   # 10% of 768 GB
+
+
+def test_host_without_vms_is_zero_and_unknown_size_is_no_data():
+    assert monster(vms=[]) == (0.0, 0.0)
+    assert monster(host_cores=None, dram_gb=None, vms=[(4, 4)]) == (None, None)
+
+
+def test_cluster_monster_ratio_is_the_worst_host():
+    stats = {("h1", "hardware|cpuInfo|num_CpuCores"): 16, ("h2", "hardware|cpuInfo|num_CpuCores"): 64,
+             ("v1", "config|hardware|num_Cpu"): 8, ("v2", "config|hardware|num_Cpu"): 8}
+    snap = traversal.ClusterSnapshot("c1", [("h1", "a"), ("h2", "b")],
+                                     {"h1": [("v1", "v1")], "h2": [("v2", "v2")]}, stats, {})
+    cluster, _ = traversal.collect_cluster_and_host_metrics(snap)
+    assert cluster["cpu_monster_vm_size_ratio"] == 8 / 8   # h1: 8 vCPU vs 8; h2: 8 vs 32
+
+
+class Settings:
+    def __init__(self, **values):
+        self.values = values
+
+    def get_identifier_value(self, key, default=None):
+        return self.values.get(key, default)
+
+
+@pytest.mark.parametrize("raw, expected", [("40", 40.0), ("", 50), ("abc", 50), ("0", 50), ("101", 50)])
+def test_invalid_monster_setting_uses_the_default(raw, expected):
+    import adapter
+    assert adapter._number_setting(Settings(monster_vm_threshold_pct=raw), "monster_vm_threshold_pct", 50, 1, 100) == expected

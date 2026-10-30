@@ -16,9 +16,7 @@ Guardrails (enforced by tests/test_native_projection.py):
 from __future__ import annotations
 
 from constants_cluster import METRIC_CLUSTER_CPU_IMBALANCE
-from constants_cluster import METRIC_CLUSTER_CPU_MONSTER_VM_RATIO
 from constants_cluster import METRIC_CLUSTER_CPU_OVERCOMMIT_RATIO
-from constants_cluster import METRIC_CLUSTER_MEMORY_MONSTER_VM_RATIO
 from constants_cluster import METRIC_CLUSTER_MEMORY_OVERCOMMIT_RATIO
 from constants_cluster import METRIC_CPU_THREAD_UTILIZATION
 from constants_cluster import METRIC_DISK_IOPS
@@ -32,11 +30,12 @@ from constants_host import HOST_METRIC_MEMORY_BALLOONED
 from constants_host import HOST_METRIC_MEMORY_CONSUMED
 from constants_host import HOST_METRIC_MEMORY_OVERCOMMIT_RATIO
 from constants_host import HOST_METRIC_MEMORY_RESERVATION
-from constants_host import HOST_METRIC_MONSTER_VM_COUNT
+from constants_shared import METRIC_CPU_MONSTER_VM_SIZE_RATIO
 from constants_shared import METRIC_HOST_CPU_IMBALANCE_RATIO
 from constants_shared import METRIC_HOST_DROPPED_PACKETS
 from constants_shared import METRIC_HOST_MEMORY_CONTENTION
 from constants_shared import METRIC_HOST_MEMORY_ZIP_SWAP
+from constants_shared import METRIC_MEMORY_MONSTER_VM_SIZE_RATIO
 from constants_shared import METRIC_P90_DISK_LATENCY
 from constants_shared import METRIC_P90_MEMORY_CONTENTION
 from constants_shared import METRIC_P90_VCPU_COSTOP
@@ -63,6 +62,8 @@ _SHARED = {
     METRIC_HOST_DROPPED_PACKETS: ("Network", "Host Dropped Packets Pct"),
     METRIC_HOST_MEMORY_ZIP_SWAP: ("Memory", "Host Zip Swap Pct"),
     METRIC_HOST_CPU_IMBALANCE_RATIO: ("Balance", "Host CPU Imbalance Ratio"),
+    METRIC_CPU_MONSTER_VM_SIZE_RATIO: ("CPU", "Monster VM Size Ratio"),
+    METRIC_MEMORY_MONSTER_VM_SIZE_RATIO: ("Memory", "Monster VM Size Ratio"),
 }
 
 # metric key -> (group, label)
@@ -70,12 +71,10 @@ CLUSTER_PROJECTION = {
     **_SHARED,
     METRIC_CPU_THREAD_UTILIZATION: ("CPU", "Max Host Thread Utilization Pct"),
     METRIC_CLUSTER_CPU_OVERCOMMIT_RATIO: ("CPU", "Overcommit Ratio"),
-    METRIC_CLUSTER_CPU_MONSTER_VM_RATIO: ("CPU", "Monster VM Ratio"),
     METRIC_CLUSTER_CPU_IMBALANCE: ("Balance", "DRS CPU Imbalance"),
     METRIC_VMOTION_PCT: ("Balance", "vMotion Pct"),
     METRIC_MEMORY_BALLOONED: ("Memory", "Max Host Ballooned Pct"),
     METRIC_CLUSTER_MEMORY_OVERCOMMIT_RATIO: ("Memory", "Overcommit Ratio"),
-    METRIC_CLUSTER_MEMORY_MONSTER_VM_RATIO: ("Memory", "Monster VM Ratio"),
     METRIC_NETWORK_THROUGHPUT: ("Network", "Max Host Throughput Pct"),
     METRIC_DISK_IOPS: ("Storage", "Max Host Disk IOPS"),
 }
@@ -85,7 +84,6 @@ HOST_PROJECTION = {
     HOST_METRIC_CPU_THREAD_UTILIZATION: ("CPU", "Thread Utilization Pct"),
     HOST_METRIC_CPU_RESERVATION: ("CPU", "Reservation Pct"),
     HOST_METRIC_CPU_OVERCOMMIT_RATIO: ("CPU", "Overcommit Ratio"),
-    HOST_METRIC_MONSTER_VM_COUNT: ("CPU", "Monster VM Count"),
     HOST_METRIC_MEMORY_CONSUMED: ("Memory", "Consumed Pct"),
     HOST_METRIC_MEMORY_BALLOONED: ("Memory", "Ballooned Pct"),
     HOST_METRIC_MEMORY_RESERVATION: ("Memory", "Reservation Pct"),

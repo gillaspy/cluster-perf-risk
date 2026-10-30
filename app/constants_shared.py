@@ -29,13 +29,26 @@ STALE_AFTER_MINUTES = 10
 # clock-based half of the staleness check gives a false "stale".
 CLOCK_SKEW_TOLERANCE_MINUTES = 5
 
-# Adapter parameter key for the monster-VM threshold (see get_adapter_definition
-# in adapter.py). Read via adapter_instance.get_identifier_value() at collect
-# time -- never hardcode the threshold in adapter.py. Feeds monster VM detection
-# in traversal.py, which drives both the cluster ratio metrics and the host raw
-# count metric.
+# Monster VM settings (adapter instance, Advanced). Read at collect time --
+# never hardcode them. Since 2.2.0 a host's monster size is:
+#   CPU:    PARAM_MONSTER_VM_THRESHOLD_PCT % of its physical cores (the key
+#           predates 2.2.0, when it applied to memory as well);
+#   memory: PARAM_MONSTER_VM_MEMORY_PCT % of its DRAM, but at most
+#           PARAM_MONSTER_VM_MEMORY_CAP_GB.
 PARAM_MONSTER_VM_THRESHOLD_PCT = "monster_vm_threshold_pct"
 DEFAULT_MONSTER_VM_THRESHOLD_PCT = 50
+PARAM_MONSTER_VM_MEMORY_PCT = "monster_vm_memory_pct"
+DEFAULT_MONSTER_VM_MEMORY_PCT = 40
+PARAM_MONSTER_VM_MEMORY_CAP_GB = "monster_vm_memory_cap_gb"
+DEFAULT_MONSTER_VM_MEMORY_CAP_GB = 256
+
+# Monster VM size ratios, since 2.2.0, on hosts and clusters (worst host):
+# the largest powered-on VM's vCPUs (memory) / the host's monster size. 1 is
+# exactly the monster size; above 1 it is a monster. A host with no
+# powered-on VMs is 0. Replace the cluster Monster VM Ratio (monster VMs per
+# host) and the host Monster VM Count.
+METRIC_CPU_MONSTER_VM_SIZE_RATIO = "cpu_monster_vm_size_ratio"
+METRIC_MEMORY_MONSTER_VM_SIZE_RATIO = "memory_monster_vm_size_ratio"
 
 # Raw statkey "cpu|utilization_average" -- reused across scopes: cluster.py's
 # NATIVE_STATKEY_MAP maps it to the cluster metric METRIC_CPU_THREAD_UTILIZATION
@@ -58,10 +71,10 @@ MEMORY_BALLOON_KB_STATKEY = "mem|vmmemctl_average"
 MEMORY_DRAM_CAPACITY_KB_STATKEY = "mem:DRAM|memory_tier_total_capacity"
 MEMORY_TOTAL_CAPACITY_KB_STATKEY = "mem|host_provisioned"
 
-# Monster VM detection (traversal.py): a VM counts as a CPU (or memory) monster
-# VM when its vCPU count (or memory) exceeds monster_vm_threshold_pct of its
-# host's total CPU cores (or memory) -- a practical proxy for "may not fit in
-# one NUMA node", since NUMA topology isn't exposed via SuiteAPI. Confirmed live
+# Monster VM detection (traversal.py): the largest powered-on VM against its
+# host's monster size (see METRIC_CPU_MONSTER_VM_SIZE_RATIO) -- a practical
+# proxy for "may not fit in one NUMA node", since NUMA topology isn't exposed
+# via SuiteAPI. Confirmed live
 # 2026-08-15 against ops.vcf.gillaspy.org: all three keys return real,
 # non-property (i.e. /stats/latest-fetchable) data. mem|guest_provisioned
 # mirrors mem|host_provisioned's KB convention, so no unit conversion needed

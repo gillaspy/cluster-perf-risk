@@ -144,14 +144,15 @@ def test_powered_off_vm_is_excluded_everywhere():
     assert vm_call and vm_call[0].args[1] == ["vm-on"]
     assert snap.vms_not_powered_on == 2
 
-    cluster, hosts = traversal.collect_cluster_and_host_metrics(snap, 50)
+    cluster, hosts = traversal.collect_cluster_and_host_metrics(snap)
     (_, _, h), = hosts
     assert cluster["worst_vcpu_ready_pct"] == 1.0 and cluster["p90_vcpu_ready_pct"] == 1.0
     assert h["host_cpu_overcommit_ratio"] == 4 / 16
     assert h["host_memory_overcommit_ratio"] == 4 / 64
-    assert h["host_monster_vm_count"] == 0
-    assert cluster["cluster_cpu_monster_vm_ratio"] == 0
-    assert cluster["cluster_memory_monster_vm_ratio"] == 0
+    # Only vm-on (4 vCPU, 4 GB) counts: monster size is 8 vCPU (50% of 16
+    # cores) and 25.6 GB (40% of 64 GB).
+    assert h["cpu_monster_vm_size_ratio"] == cluster["cpu_monster_vm_size_ratio"] == 4 / 8
+    assert h["memory_monster_vm_size_ratio"] == cluster["memory_monster_vm_size_ratio"] == 4 / 25.6
 
 
 def test_snapshot_refuses_a_key_it_did_not_fetch():
@@ -180,7 +181,7 @@ def test_overcommit_uses_native_allocation_stats_when_present():
     host = {**HOST_STATS, "cpu|vcpus_allocated_on_all_powered_on_vms": 8,
             "mem|memory_allocated_on_all_powered_on_vms": 16 * 1024 * 1024}
     snap, _ = snapshot_with({"vm-on": "Powered On", "vm-off": "Powered Off", "vm-unknown": None}, host)
-    _, hosts = traversal.collect_cluster_and_host_metrics(snap, 50)
+    _, hosts = traversal.collect_cluster_and_host_metrics(snap)
     (_, _, h), = hosts
     assert h["host_cpu_overcommit_ratio"] == 8 / 16
     assert h["host_memory_overcommit_ratio"] == 16 / 64

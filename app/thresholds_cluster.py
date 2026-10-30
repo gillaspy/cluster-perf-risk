@@ -6,9 +6,7 @@ host object live in thresholds_shared.py instead.
 from __future__ import annotations
 
 from constants_cluster import METRIC_CLUSTER_CPU_IMBALANCE
-from constants_cluster import METRIC_CLUSTER_CPU_MONSTER_VM_RATIO
 from constants_cluster import METRIC_CLUSTER_CPU_OVERCOMMIT_RATIO
-from constants_cluster import METRIC_CLUSTER_MEMORY_MONSTER_VM_RATIO
 from constants_cluster import METRIC_CLUSTER_MEMORY_OVERCOMMIT_RATIO
 from constants_cluster import METRIC_CPU_THREAD_UTILIZATION
 from constants_cluster import METRIC_DISK_IOPS
@@ -51,11 +49,6 @@ BAND_BOUNDS = {
     # mem=0.42 (green); wld-cl01 cpu=0.5, mem=0.15 (both green).
     METRIC_CLUSTER_CPU_OVERCOMMIT_RATIO: {"green_max": 1, "yellow_max": 2, "orange_max": 3},
     METRIC_CLUSTER_MEMORY_OVERCOMMIT_RATIO: {"green_max": 1, "yellow_max": 1.25, "orange_max": 1.5},
-    # Replaces the old raw-count monster VM metrics at cluster scope (host
-    # scope keeps a raw count -- HOST_METRIC_MONSTER_VM_COUNT in
-    # thresholds_host.py).
-    METRIC_CLUSTER_CPU_MONSTER_VM_RATIO: {"green_max": 1, "yellow_max": 2, "orange_max": 4},
-    METRIC_CLUSTER_MEMORY_MONSTER_VM_RATIO: {"green_max": 1, "yellow_max": 2, "orange_max": 4},
 }
 
 WEIGHTS = {
@@ -65,10 +58,7 @@ WEIGHTS = {
     METRIC_DISK_IOPS: 0.75,
     METRIC_CLUSTER_CPU_IMBALANCE: 0.75,
     METRIC_VMOTION_PCT: 0.75,
-    # 2026-08-17 net-new. Monster VM ratios weighted higher, matching the old
-    # raw-count metrics they replace.
+    # 2026-08-17 net-new.
     METRIC_CLUSTER_CPU_OVERCOMMIT_RATIO: 1.0,
     METRIC_CLUSTER_MEMORY_OVERCOMMIT_RATIO: 1.0,
-    METRIC_CLUSTER_CPU_MONSTER_VM_RATIO: 1.25,
-    METRIC_CLUSTER_MEMORY_MONSTER_VM_RATIO: 1.25,
 }

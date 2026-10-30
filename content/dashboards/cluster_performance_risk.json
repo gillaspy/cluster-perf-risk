@@ -438,8 +438,14 @@
               },
               {
                 "boxLabel": "",
-                "metricName": "Monster VM Count",
-                "metricKey": "Performance Risk|CPU|Monster VM Count",
+                "metricName": "CPU Monster VM Size Ratio",
+                "metricKey": "Performance Risk|CPU|Monster VM Size Ratio",
+                "resourceKindId": "resourceKind:id:1_::_"
+              },
+              {
+                "boxLabel": "",
+                "metricName": "Memory Monster VM Size Ratio",
+                "metricKey": "Performance Risk|Memory|Monster VM Size Ratio",
                 "resourceKindId": "resourceKind:id:1_::_"
               },
               {
