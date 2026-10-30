@@ -16,19 +16,20 @@ SHARED = {
     "p90_disk_latency_ms": (20, 40, 60),
     "host_memory_contention_pct": (0.25, 0.5, 1),
     "host_dropped_packets_pct": (0, 0.2, 0.4),
+    "host_memory_zip_swap_pct": (0.25, 0.5, 1),     # 2.2.0, new
+    "host_cpu_imbalance_ratio": (1.2, 1.4, 1.6),    # 2.2.0, replaces the stdev stand-in
+    "cpu_monster_vm_size_ratio": (1, 2, 3),         # 2.2.0, replaces monster VM ratio/count
+    "memory_monster_vm_size_ratio": (1, 2, 3),      # 2.2.0, replaces monster VM ratio/count
 }
 CLUSTER = {
     "cpu_thread_utilization_pct": (60, 80, 90),
     "memory_ballooned_pct": (1, 2, 4),              # 2.1.0, was 1/1.25/2
     "network_throughput_pct": (1, 2, 4),
     "disk_iops": (25000, 50000, 100000),
-    "highest_host_cpu_imbalance_pct": (5, 10, 20),
     "cluster_cpu_imbalance": (0.05, 0.08, 0.12),
     "vmotion_pct": (1, 2, 4),
     "cluster_cpu_overcommit_ratio": (1, 2, 3),
     "cluster_memory_overcommit_ratio": (1, 1.25, 1.5),
-    "cluster_cpu_monster_vm_ratio": (1, 2, 4),
-    "cluster_memory_monster_vm_ratio": (1, 2, 4),
 }
 HOST = {
     "host_cpu_thread_utilization_pct": (60, 80, 90),
@@ -38,7 +39,6 @@ HOST = {
     "host_memory_reservation_pct": (10, 40, 60),    # 2.1.0, was 40/60/80
     "host_cpu_overcommit_ratio": (1, 2, 3),
     "host_memory_overcommit_ratio": (1, 1.4, 1.8),  # 2.1.0, was 1/1.4/1.6
-    "host_monster_vm_count": (0, 1, 2),
 }
 
 

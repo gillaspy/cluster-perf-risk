@@ -25,14 +25,13 @@ output instead of each doing their own walk.
 from __future__ import annotations
 
 import math
+from typing import NamedTuple
 from typing import Optional
 
 import aria.ops.adapter_logging as logging
 from aria.ops.suite_api_client import SuiteApiClient
 from constants_cluster import CLUSTER_LEVEL_METRICS
 from constants_cluster import HOST_LINKSPEED_PROPERTY
-from constants_cluster import METRIC_CLUSTER_CPU_MONSTER_VM_RATIO
-from constants_cluster import METRIC_CLUSTER_MEMORY_MONSTER_VM_RATIO
 from constants_cluster import NATIVE_STATKEY_MAP
 from constants_cluster import NETWORK_USAGE_AVERAGE_STATKEY
 from constants_cluster import NUMBER_VMOTION_STATKEY
@@ -46,20 +45,31 @@ from constants_host import HOST_METRIC_MEMORY_BALLOONED
 from constants_host import HOST_METRIC_MEMORY_CONSUMED
 from constants_host import HOST_METRIC_MEMORY_OVERCOMMIT_RATIO
 from constants_host import HOST_METRIC_MEMORY_RESERVATION
-from constants_host import HOST_METRIC_MONSTER_VM_COUNT
 from constants_host import HOST_MEMORY_ALLOCATED_KB_STATKEY
 from constants_host import HOST_MEMORY_RESERVED_PCT_STATKEY
 from constants_host import HOST_MEMORY_USAGE_STATKEY
 from constants_host import HOST_VCPUS_ALLOCATED_STATKEY
 from constants_shared import CPU_UTILIZATION_STATKEY
+from constants_shared import DEFAULT_MONSTER_VM_MEMORY_CAP_GB
+from constants_shared import DEFAULT_MONSTER_VM_MEMORY_PCT
+from constants_shared import DEFAULT_MONSTER_VM_THRESHOLD_PCT
+from constants_shared import HOST_CPU_CORE_UTILIZATION_STATKEY
 from constants_shared import HOST_CPU_CORES_STATKEY
 from constants_shared import HOST_DROPPED_PACKETS_STATKEY
+from constants_shared import HOST_HT_ACTIVE_PROPERTY
+from constants_shared import HOST_HT_AVAILABLE_PROPERTY
 from constants_shared import HOST_MEMORY_CONTENTION_STATKEY
 from constants_shared import MEMORY_BALLOON_KB_STATKEY
 from constants_shared import MEMORY_DRAM_CAPACITY_KB_STATKEY
 from constants_shared import MEMORY_TOTAL_CAPACITY_KB_STATKEY
+from constants_shared import METRIC_CPU_MONSTER_VM_SIZE_RATIO
+from constants_shared import METRIC_HOST_CPU_IMBALANCE_RATIO
 from constants_shared import METRIC_HOST_DROPPED_PACKETS
 from constants_shared import METRIC_HOST_MEMORY_CONTENTION
+from constants_shared import METRIC_HOST_MEMORY_ZIP_SWAP
+from constants_shared import METRIC_MEMORY_MONSTER_VM_SIZE_RATIO
+from constants_shared import MEMORY_COMPRESSED_KB_STATKEY
+from constants_shared import MEMORY_SWAPOUT_KB_STATKEY
 from constants_shared import RESOURCE_KIND_VM
 from constants_shared import VM_POWER_STATE_PROPERTY
 from constants_shared import VM_POWERED_ON
@@ -73,6 +83,16 @@ from suite_api import fetch_child_hosts
 from suite_api import fetch_children_of_kind
 
 logger = logging.getLogger(__name__)
+
+KB_PER_GB = 1024 * 1024
+
+
+class MonsterVmSettings(NamedTuple):
+    """The adapter instance's monster VM settings (see constants_shared.py)."""
+
+    cpu_pct: float = DEFAULT_MONSTER_VM_THRESHOLD_PCT
+    memory_pct: float = DEFAULT_MONSTER_VM_MEMORY_PCT
+    memory_cap_gb: float = DEFAULT_MONSTER_VM_MEMORY_CAP_GB
 
 
 def _percentile(sorted_values: list[float], pct: float) -> float:
@@ -104,10 +124,12 @@ HOST_STATKEYS = sorted(
         HOST_MEMORY_RESERVED_PCT_STATKEY, HOST_CPU_RESERVED_STATKEY,
         HOST_CPU_CAPACITY_STATKEY, NETWORK_USAGE_AVERAGE_STATKEY,
         HOST_VCPUS_ALLOCATED_STATKEY, HOST_MEMORY_ALLOCATED_KB_STATKEY,
+        MEMORY_COMPRESSED_KB_STATKEY, MEMORY_SWAPOUT_KB_STATKEY,
+        HOST_CPU_CORE_UTILIZATION_STATKEY,
     }
 )
 VM_STATKEYS = sorted({VM_NUM_CPU_STATKEY, VM_MEMORY_KB_STATKEY, *VM_LEVEL_STATKEYS.values()})
-HOST_PROPERTY_KEYS = [HOST_LINKSPEED_PROPERTY]
+HOST_PROPERTY_KEYS = [HOST_LINKSPEED_PROPERTY, HOST_HT_AVAILABLE_PROPERTY, HOST_HT_ACTIVE_PROPERTY]
 VM_PROPERTY_KEYS = [VM_POWER_STATE_PROPERTY]
 
 
@@ -189,6 +211,52 @@ def host_memory_capacity_kb(snap: ClusterSnapshot, host_id: str) -> Optional[flo
     return snap.stat(host_id, MEMORY_TOTAL_CAPACITY_KB_STATKEY)
 
 
+def host_zip_swap_pct(snap: ClusterSnapshot, host_id: str, host_mem_kb: Optional[float]) -> Optional[float]:
+    """(compressed + swapped-out) KB as a % of host DRAM. No data when either
+    stat or the DRAM is missing -- never half a sum."""
+    compressed_kb = snap.stat(host_id, MEMORY_COMPRESSED_KB_STATKEY)
+    swapout_kb = snap.stat(host_id, MEMORY_SWAPOUT_KB_STATKEY)
+    if compressed_kb is None or swapout_kb is None or not host_mem_kb:
+        return None
+    return (compressed_kb + swapout_kb) / host_mem_kb * 100
+
+
+def host_cpu_imbalance_ratio(snap: ClusterSnapshot, host_id: str, host_cores: Optional[float]) -> Optional[float]:
+    """Running threads per running core (see METRIC_HOST_CPU_IMBALANCE_RATIO).
+    An idle host (nothing running) is 1, not imbalanced; any input missing is
+    no data."""
+    thread_util = snap.stat(host_id, CPU_UTILIZATION_STATKEY)
+    core_util = snap.stat(host_id, HOST_CPU_CORE_UTILIZATION_STATKEY)
+    if thread_util is None or core_util is None or not host_cores:
+        return None
+    hyperthreaded = (
+        snap.prop(host_id, HOST_HT_AVAILABLE_PROPERTY) == "true"
+        and snap.prop(host_id, HOST_HT_ACTIVE_PROPERTY) == "true"
+    )
+    threads = host_cores * 2 if hyperthreaded else host_cores
+    running_threads = thread_util / 100 * threads
+    running_cores = core_util / 100 * host_cores
+    if not running_cores:
+        return 1.0 if not running_threads else None
+    return running_threads / running_cores
+
+
+def monster_size_ratio(sizes: list[float], monster_size: Optional[float], vm_count: int) -> Optional[float]:
+    """The largest VM's size / the host's monster size. 0 for a host with no
+    powered-on VMs; no data when the monster size is unknown, or when the
+    host has VMs but none of their sizes are known."""
+    if not monster_size:
+        return None
+    if not sizes:
+        return 0.0 if vm_count == 0 else None
+    return max(sizes) / monster_size
+
+
+def _worst(values: list[Optional[float]]) -> Optional[float]:
+    known = [v for v in values if v is not None]
+    return max(known) if known else None
+
+
 def _worst_p90_into(
     target: dict[str, Optional[float]], samples_by_key: dict[str, list[float]]
 ) -> None:
@@ -207,7 +275,7 @@ def _worst_p90_into(
 
 
 def collect_cluster_and_host_metrics(
-    snap: ClusterSnapshot, monster_vm_threshold_pct: float
+    snap: ClusterSnapshot, monster: MonsterVmSettings = MonsterVmSettings()
 ) -> tuple[dict[str, Optional[float]], list[tuple[str, str, dict[str, Optional[float]]]]]:
     """
     Returns (cluster_metric_values, host_records) where host_records is a
@@ -216,20 +284,18 @@ def collect_cluster_and_host_metrics(
     """
     host_ids_and_names = snap.hosts
 
-    cpu_monster_count = 0
-    memory_monster_count = 0
-    saw_host_capacity_data = False
+    host_cpu_monster_ratios: list[Optional[float]] = []
+    host_memory_monster_ratios: list[Optional[float]] = []
     cluster_vm_samples: dict[str, list[float]] = {key: [] for key in VM_LEVEL_STATKEYS}
     host_memory_contention_samples = []
     host_dropped_packets_samples = []
+    host_zip_swap_samples = []
+    host_imbalance_samples = []
     host_records: list[tuple[str, str, dict[str, Optional[float]]]] = []
 
     for host_id, host_name in host_ids_and_names:
         host_cores = snap.stat(host_id, HOST_CPU_CORES_STATKEY)
         host_mem_kb = host_memory_capacity_kb(snap, host_id)
-        host_has_capacity_data = bool(host_cores or host_mem_kb)
-        if host_has_capacity_data:
-            saw_host_capacity_data = True
 
         host_mem_contention = snap.stat(host_id, HOST_MEMORY_CONTENTION_STATKEY)
         if host_mem_contention is not None:
@@ -237,6 +303,14 @@ def collect_cluster_and_host_metrics(
         host_dropped_pct = snap.stat(host_id, HOST_DROPPED_PACKETS_STATKEY)
         if host_dropped_pct is not None:
             host_dropped_packets_samples.append(host_dropped_pct)
+
+        host_zip_swap = host_zip_swap_pct(snap, host_id, host_mem_kb)
+        if host_zip_swap is not None:
+            host_zip_swap_samples.append(host_zip_swap)
+
+        host_imbalance = host_cpu_imbalance_ratio(snap, host_id, host_cores)
+        if host_imbalance is not None:
+            host_imbalance_samples.append(host_imbalance)
 
         host_cpu_util = snap.stat(host_id, CPU_UTILIZATION_STATKEY)
         host_mem_usage = snap.stat(host_id, HOST_MEMORY_USAGE_STATKEY)
@@ -257,24 +331,21 @@ def collect_cluster_and_host_metrics(
 
         vm_records = snap.vms_by_host.get(host_id, [])
         host_vm_samples: dict[str, list[float]] = {key: [] for key in VM_LEVEL_STATKEYS}
-        host_monster_vm_ids: set[str] = set()
         host_total_vcpu = 0.0
         host_total_vmem_kb = 0.0
+        vm_vcpus: list[float] = []
+        vm_mem_kbs: list[float] = []
 
         for vm_id, _vm_name in vm_records:
             vcpu = snap.stat(vm_id, VM_NUM_CPU_STATKEY)
             if vcpu is not None:
                 host_total_vcpu += vcpu
-                if host_cores and (vcpu / host_cores) * 100 > monster_vm_threshold_pct:
-                    cpu_monster_count += 1
-                    host_monster_vm_ids.add(vm_id)
+                vm_vcpus.append(vcpu)
 
             vmem_kb = snap.stat(vm_id, VM_MEMORY_KB_STATKEY)
             if vmem_kb is not None:
                 host_total_vmem_kb += vmem_kb
-                if host_mem_kb and (vmem_kb / host_mem_kb) * 100 > monster_vm_threshold_pct:
-                    memory_monster_count += 1
-                    host_monster_vm_ids.add(vm_id)
+                vm_mem_kbs.append(vmem_kb)
 
             for sample_key, statkey in VM_LEVEL_STATKEYS.items():
                 value = snap.stat(vm_id, statkey)
@@ -290,6 +361,16 @@ def collect_cluster_and_host_metrics(
         if native_vmem_kb is not None:
             host_total_vmem_kb = native_vmem_kb
 
+        cpu_monster_size = host_cores * monster.cpu_pct / 100 if host_cores else None
+        memory_monster_kb = (
+            min(host_mem_kb * monster.memory_pct / 100, monster.memory_cap_gb * KB_PER_GB)
+            if host_mem_kb else None
+        )
+        host_cpu_monster = monster_size_ratio(vm_vcpus, cpu_monster_size, len(vm_records))
+        host_memory_monster = monster_size_ratio(vm_mem_kbs, memory_monster_kb, len(vm_records))
+        host_cpu_monster_ratios.append(host_cpu_monster)
+        host_memory_monster_ratios.append(host_memory_monster)
+
         host_metric_values: dict[str, Optional[float]] = {
             HOST_METRIC_CPU_THREAD_UTILIZATION: host_cpu_util,
             HOST_METRIC_MEMORY_CONSUMED: host_mem_usage,
@@ -302,11 +383,12 @@ def collect_cluster_and_host_metrics(
             HOST_METRIC_MEMORY_OVERCOMMIT_RATIO: (
                 (host_total_vmem_kb / host_mem_kb) if host_mem_kb else None
             ),
-            HOST_METRIC_MONSTER_VM_COUNT: (
-                len(host_monster_vm_ids) if host_has_capacity_data else None
-            ),
+            METRIC_CPU_MONSTER_VM_SIZE_RATIO: host_cpu_monster,
+            METRIC_MEMORY_MONSTER_VM_SIZE_RATIO: host_memory_monster,
             METRIC_HOST_MEMORY_CONTENTION: host_mem_contention,
             METRIC_HOST_DROPPED_PACKETS: host_dropped_pct,
+            METRIC_HOST_MEMORY_ZIP_SWAP: host_zip_swap,
+            METRIC_HOST_CPU_IMBALANCE_RATIO: host_imbalance,
         }
         _worst_p90_into(host_metric_values, host_vm_samples)
         host_records.append((host_id, host_name, host_metric_values))
@@ -314,23 +396,20 @@ def collect_cluster_and_host_metrics(
     if snap.vms_not_powered_on:
         logger.debug(f"Cluster {snap.cluster_id}: {snap.vms_not_powered_on} VMs not powered on, not counted")
 
-    host_count = len(host_ids_and_names)
     cluster_results: dict[str, Optional[float]] = {
-        METRIC_CLUSTER_CPU_MONSTER_VM_RATIO: (
-            cpu_monster_count / host_count
-            if saw_host_capacity_data and host_count
-            else None
-        ),
-        METRIC_CLUSTER_MEMORY_MONSTER_VM_RATIO: (
-            memory_monster_count / host_count
-            if saw_host_capacity_data and host_count
-            else None
-        ),
+        METRIC_CPU_MONSTER_VM_SIZE_RATIO: _worst(host_cpu_monster_ratios),
+        METRIC_MEMORY_MONSTER_VM_SIZE_RATIO: _worst(host_memory_monster_ratios),
         METRIC_HOST_MEMORY_CONTENTION: (
             max(host_memory_contention_samples) if host_memory_contention_samples else None
         ),
         METRIC_HOST_DROPPED_PACKETS: (
             max(host_dropped_packets_samples) if host_dropped_packets_samples else None
+        ),
+        METRIC_HOST_MEMORY_ZIP_SWAP: (
+            max(host_zip_swap_samples) if host_zip_swap_samples else None
+        ),
+        METRIC_HOST_CPU_IMBALANCE_RATIO: (
+            max(host_imbalance_samples) if host_imbalance_samples else None
         ),
     }
     _worst_p90_into(cluster_results, cluster_vm_samples)

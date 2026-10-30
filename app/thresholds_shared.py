@@ -4,8 +4,12 @@ cluster and host scopes (see constants_shared.py).
 """
 from __future__ import annotations
 
+from constants_shared import METRIC_CPU_MONSTER_VM_SIZE_RATIO
+from constants_shared import METRIC_HOST_CPU_IMBALANCE_RATIO
+from constants_shared import METRIC_MEMORY_MONSTER_VM_SIZE_RATIO
 from constants_shared import METRIC_HOST_DROPPED_PACKETS
 from constants_shared import METRIC_HOST_MEMORY_CONTENTION
+from constants_shared import METRIC_HOST_MEMORY_ZIP_SWAP
 from constants_shared import METRIC_P90_DISK_LATENCY
 from constants_shared import METRIC_P90_MEMORY_CONTENTION
 from constants_shared import METRIC_P90_VCPU_COSTOP
@@ -43,6 +47,16 @@ BAND_BOUNDS = {
     # constants_shared.py). Exact-zero green confirmed reasonable in practice:
     # live 2026-08-17 measurement was 0.0 on all 3 hosts checked.
     METRIC_HOST_DROPPED_PACKETS: {"green_max": 0, "yellow_max": 0.2, "orange_max": 0.4},
+    # 2.2.0, new.
+    METRIC_HOST_MEMORY_ZIP_SWAP: {"green_max": 0.25, "yellow_max": 0.5, "orange_max": 1},
+    # 2.2.0, new. Green up to 1.2: on the lab every host ran at 1.05-1.15
+    # with nothing wrong, so green at exactly 1 would have made every object
+    # yellow.
+    METRIC_HOST_CPU_IMBALANCE_RATIO: {"green_max": 1.2, "yellow_max": 1.4, "orange_max": 1.6},
+    # 2.2.0, replace the cluster Monster VM Ratio (1/2/4) and the host
+    # Monster VM Count (0/1/2). 1 is exactly the host's monster size.
+    METRIC_CPU_MONSTER_VM_SIZE_RATIO: {"green_max": 1, "yellow_max": 2, "orange_max": 3},
+    METRIC_MEMORY_MONSTER_VM_SIZE_RATIO: {"green_max": 1, "yellow_max": 2, "orange_max": 3},
 }
 
 # Monster VM counts weighted higher -- more direct predictor of noisy-neighbor risk
@@ -60,4 +74,9 @@ WEIGHTS = {
     METRIC_P90_DISK_LATENCY: 0.75,
     METRIC_HOST_MEMORY_CONTENTION: 0.75,
     METRIC_HOST_DROPPED_PACKETS: 0.75,
+    METRIC_HOST_MEMORY_ZIP_SWAP: 1.0,
+    METRIC_HOST_CPU_IMBALANCE_RATIO: 0.75,
+    # Weighted like the monster VM metrics they replace.
+    METRIC_CPU_MONSTER_VM_SIZE_RATIO: 1.25,
+    METRIC_MEMORY_MONSTER_VM_SIZE_RATIO: 1.25,
 }

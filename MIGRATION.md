@@ -1,3 +1,41 @@
+# Migrating to 2.2.0
+
+2.2.0 adds and redefines risk sub-metrics, so **some objects change color
+after the upgrade**. Upgrade like 2.1.1: delete the "Cluster Performance
+Risk" dashboard, install the pak with "Install the PAK file even if it is
+already installed", restart collection if the account stops, and open the
+dashboard from Dashboards > All.
+
+## New
+- **Host Zip Swap Pct** (Memory, hosts and clusters): compressed plus
+  swapped-out memory as a % of host DRAM. Bands 0.25 / 0.5 / 1.
+- **Host CPU Imbalance Ratio** (Balance, hosts and clusters): running
+  threads per running core. Bands 1.2 / 1.4 / 1.6.
+- **Monster VM Size Ratio** (CPU and Memory, hosts and clusters): the
+  largest powered-on VM against the host's monster size. Bands 1 / 2 / 3.
+- Adapter instance settings **Monster VM Memory (% of host DRAM)** (default
+  40) and **Monster VM Memory Cap (GB)** (default 256).
+
+## No longer written
+These keep their history but get no new values; repoint anything built on
+them (views, super metrics, alerts):
+
+| Old attribute | Scope | Replaced by |
+|---|---|---|
+| `Performance Risk|Balance|Host CPU Imbalance Pct` | cluster | `Performance Risk|Balance|Host CPU Imbalance Ratio` |
+| `Performance Risk|CPU|Monster VM Ratio` | cluster | `Performance Risk|CPU|Monster VM Size Ratio` |
+| `Performance Risk|Memory|Monster VM Ratio` | cluster | `Performance Risk|Memory|Monster VM Size Ratio` |
+| `Performance Risk|CPU|Monster VM Count` | host | `Performance Risk|CPU|Monster VM Size Ratio` and `Performance Risk|Memory|Monster VM Size Ratio` |
+
+## Changed
+- **Host CPU Reservation Pct** is now against `cpu|totalCapacity_average`
+  (the capacity available to VMs) instead of `cpu|capacity_provisioned`. On
+  the lab that reads about 1.66x higher.
+- **Monster VM Threshold** is now **Monster VM CPU (% of host cores)** and
+  applies to CPU only (same key, `monster_vm_threshold_pct`). Memory uses
+  the two new settings. If you had changed the threshold for memory, set
+  Monster VM Memory instead.
+
 # Migrating to 2.1.1
 
 2.1.1 changes only the shipped "Cluster Performance Risk" dashboard and the

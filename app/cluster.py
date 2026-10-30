@@ -1,18 +1,15 @@
 """
 Cluster-scope metrics and scoring: the cluster-only derived metrics (ballooned
-%, CPU imbalance proxy, network throughput %, vMotion %) and the composite
+%, network throughput %, vMotion %) and the composite
 score. The results are projected onto the native ClusterComputeResource by
 native_projection.py. Metrics shared with the host scope come from
 traversal.py instead.
 """
-import statistics
 from typing import Optional
 
 from constants_cluster import CLUSTER_LEVEL_METRICS
 from constants_cluster import HOST_LINKSPEED_PROPERTY
 from constants_cluster import METRIC_CLUSTER_CPU_IMBALANCE
-from constants_cluster import METRIC_CPU_THREAD_UTILIZATION
-from constants_cluster import METRIC_HOST_CPU_IMBALANCE
 from constants_cluster import METRIC_MEMORY_BALLOONED
 from constants_cluster import METRIC_NETWORK_THROUGHPUT
 from constants_cluster import METRIC_VMOTION_PCT
@@ -34,7 +31,7 @@ WEIGHTS = {**thresholds_shared.WEIGHTS, **thresholds_cluster.WEIGHTS}
 
 
 def gather_metric_values(snap: ClusterSnapshot) -> dict[str, Optional[float]]:
-    """Cluster-only metrics: the NATIVE_STATKEY_MAP-driven ones plus the four
+    """Cluster-only metrics: the NATIVE_STATKEY_MAP-driven ones plus the three
     derived helpers below. Metrics shared with the host object (worst/p90 VM
     metrics, monster VM ratios, host memory contention/dropped packets) are
     filled in separately by traversal.collect_cluster_and_host_metrics()."""
@@ -46,7 +43,6 @@ def gather_metric_values(snap: ClusterSnapshot) -> dict[str, Optional[float]]:
             metric_values[metric_key] = _highest_host_stat(snap, statkey)
 
     metric_values[METRIC_MEMORY_BALLOONED] = _highest_host_ballooned_pct(snap)
-    metric_values[METRIC_HOST_CPU_IMBALANCE] = _host_cpu_imbalance_pct(snap)
     metric_values[METRIC_NETWORK_THROUGHPUT] = _network_throughput_pct(snap)
     metric_values[METRIC_VMOTION_PCT] = _vmotion_pct(snap)
 
@@ -91,26 +87,6 @@ def _highest_host_ballooned_pct(snap: ClusterSnapshot) -> Optional[float]:
             ratios.append((ballooned_kb / total_kb) * 100)
 
     return max(ratios) if ratios else None
-
-
-def _host_cpu_imbalance_pct(snap: ClusterSnapshot) -> Optional[float]:
-    """
-    No per-host CPU imbalance statkey exists -- the only real DRS imbalance
-    metric (clusterServices|total_imbalance, see METRIC_CLUSTER_CPU_IMBALANCE)
-    is cluster-level. This is a synthetic proxy for the matrix's "Highest ESXi
-    CPU Imbalance" row: population standard deviation, in percentage points, of
-    cpu|utilization_average across the cluster's hosts. Needs at least 2 hosts
-    with data to be meaningful.
-    """
-    host_ids = snap.hosts
-    cpu_statkey = NATIVE_STATKEY_MAP[METRIC_CPU_THREAD_UTILIZATION]
-
-    values = [
-        v
-        for v in (snap.stat(host_id, cpu_statkey) for host_id, _host_name in host_ids)
-        if v is not None
-    ]
-    return statistics.pstdev(values) if len(values) >= 2 else None
 
 
 def _network_throughput_pct(snap: ClusterSnapshot) -> Optional[float]:

@@ -19,8 +19,12 @@ mirroring the cluster stat's own documented definition ("vCPUs allocated to
 powered on VMs / physical cores") using the exact per-VM data already
 collected in traversal.py's shared VM pass.
 """
+from constants_shared import METRIC_CPU_MONSTER_VM_SIZE_RATIO
+from constants_shared import METRIC_HOST_CPU_IMBALANCE_RATIO
 from constants_shared import METRIC_HOST_DROPPED_PACKETS
 from constants_shared import METRIC_HOST_MEMORY_CONTENTION
+from constants_shared import METRIC_HOST_MEMORY_ZIP_SWAP
+from constants_shared import METRIC_MEMORY_MONSTER_VM_SIZE_RATIO
 from constants_shared import METRIC_P90_DISK_LATENCY
 from constants_shared import METRIC_P90_MEMORY_CONTENTION
 from constants_shared import METRIC_P90_VCPU_COSTOP
@@ -38,7 +42,6 @@ HOST_METRIC_CPU_RESERVATION = "host_cpu_reservation_pct"
 HOST_METRIC_MEMORY_RESERVATION = "host_memory_reservation_pct"
 HOST_METRIC_CPU_OVERCOMMIT_RATIO = "host_cpu_overcommit_ratio"
 HOST_METRIC_MEMORY_OVERCOMMIT_RATIO = "host_memory_overcommit_ratio"
-HOST_METRIC_MONSTER_VM_COUNT = "host_monster_vm_count"
 
 # OPEN ITEM, not implemented: host-level CPU Imbalance. No native
 # imbalance/deviation/variance-style HostSystem statkey exists (confirmed by
@@ -53,7 +56,10 @@ HOST_METRIC_MONSTER_VM_COUNT = "host_monster_vm_count"
 # True, real data) against ops.vcf.gillaspy.org.
 HOST_MEMORY_USAGE_STATKEY = "mem|usage_average"  # already a %, direct
 HOST_CPU_RESERVED_STATKEY = "cpu|reservedCapacity_average"  # MHz
-HOST_CPU_CAPACITY_STATKEY = "cpu|capacity_provisioned"  # MHz
+# MHz. Since 2.2.0 the CPU capacity available to VMs, not the provisioned
+# total: on the lab totalCapacity is about 60% of capacity_provisioned
+# (24,075 vs 39,925 MHz), so CPU reservation % reads about 1.66x higher.
+HOST_CPU_CAPACITY_STATKEY = "cpu|totalCapacity_average"
 HOST_MEMORY_RESERVED_PCT_STATKEY = "mem|reservedCapacityPct"  # already a %, direct
 
 # Native numerators of the host overcommit ratios: vCPUs and memory (KB)
@@ -72,7 +78,6 @@ HOST_BAND_PROPERTY_LABELS = {
     f"band_{HOST_METRIC_MEMORY_RESERVATION}": "Memory Reservation Band",
     f"band_{HOST_METRIC_CPU_OVERCOMMIT_RATIO}": "CPU Overcommit Ratio Band",
     f"band_{HOST_METRIC_MEMORY_OVERCOMMIT_RATIO}": "Memory Overcommit Ratio Band",
-    f"band_{HOST_METRIC_MONSTER_VM_COUNT}": "Monster VM Count Band",
     # Shared VM-level inputs, reusing the cluster-scope metric keys (see
     # constants_shared.py).
     f"band_{METRIC_WORST_VCPU_READY}": "Worst vCPU Ready Band",
@@ -85,4 +90,8 @@ HOST_BAND_PROPERTY_LABELS = {
     f"band_{METRIC_P90_DISK_LATENCY}": "P90 Disk Latency Band",
     f"band_{METRIC_HOST_MEMORY_CONTENTION}": "Host Memory Contention Band",
     f"band_{METRIC_HOST_DROPPED_PACKETS}": "Host Dropped Packets Band",
+    f"band_{METRIC_HOST_MEMORY_ZIP_SWAP}": "Host Zip Swap Band",
+    f"band_{METRIC_HOST_CPU_IMBALANCE_RATIO}": "Host CPU Imbalance Ratio Band",
+    f"band_{METRIC_CPU_MONSTER_VM_SIZE_RATIO}": "CPU Monster VM Size Ratio Band",
+    f"band_{METRIC_MEMORY_MONSTER_VM_SIZE_RATIO}": "Memory Monster VM Size Ratio Band",
 }
