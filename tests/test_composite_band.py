@@ -1,11 +1,7 @@
 """2.1.0 item 3: the composite band is the worst known sub-metric band; the
-score formula is unchanged; the dashboard colors by the band."""
-import json
-import os
-
+score formula is unchanged. The dashboard is tested in test_dashboard.py."""
 import pytest
 import scoring
-from constants_native import COMPOSITE_BAND_LEVEL_ATTR
 
 BOUNDS = {f"m{i}": {"green_max": 1, "yellow_max": 2, "orange_max": 3} for i in range(10)}
 WEIGHTS = {}
@@ -59,32 +55,3 @@ def test_score_formula_unchanged():
 def test_band_levels():
     assert scoring.BAND_LEVELS == {"green": 0, "yellow": 1, "orange": 2, "red": 3}
 
-
-DASHBOARD = os.path.join(os.path.dirname(__file__), "..", "content", "dashboards", "cluster_performance_risk.json")
-COLOR = {"green": "#74B43B", "yellow": "#ECC33E", "orange": "#F28B30", "red": "#DE3F30"}
-
-
-def _threshold_color(thresholds, value):
-    """Color of the [lo, hi] range of a heatmap threshold list that holds value."""
-    v, c = thresholds["values"], thresholds["colors"]
-    for i in range(0, len(v), 2):
-        if v[i] <= value <= v[i + 1]:
-            assert c[i] == c[i + 1]
-            return c[i]
-    return None
-
-
-def test_dashboard_colors_by_band_level_not_score():
-    db = json.load(open(DASHBOARD))["dashboards"][0]
-    heatmaps = [w for w in db["widgets"] if w["type"] == "Heatmap"]
-    scoreboards = [w for w in db["widgets"] if w["type"] == "Scoreboard"]
-    assert heatmaps and scoreboards
-    for w in heatmaps:
-        for cfg in w["config"]["configs"]:
-            assert cfg["colorBy"]["metricKey"] == COMPOSITE_BAND_LEVEL_ATTR
-            for band, level in scoring.BAND_LEVELS.items():
-                assert _threshold_color(cfg["color"]["thresholds"], level) == COLOR[band]
-    for w in scoreboards:
-        for m in w["config"]["metric"]["resourceKindMetrics"]:
-            assert m["metricKey"] == COMPOSITE_BAND_LEVEL_ATTR
-            assert (m["yellowBound"], m["orangeBound"], m["redBound"]) == (1, 2, 3)
