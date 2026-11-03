@@ -168,6 +168,75 @@ weight tables (shared thresholds from `thresholds_shared.py` merged with
    `0.0` / `"unknown"` rather than a false "green", and neither Risk Band
    Level nor Metrics In Worst Band is published.
 
+### Why this formula, not a simpler one
+
+There are three common ways to combine several colored sub-metrics into one
+number: *weighted average by color* (what this pack uses for the score),
+*weighted sum by color* (every bad sub-metric adds to a running total), and
+*worst color* (the KPI takes its worst sub-metric's color outright, as a
+vCenter alarm does). Each has a real failure mode: an average can move the
+wrong way when a sub-metric gets worse (see below); a sum runs out of scale
+once two or three sub-metrics are already red, so a cluster with two red
+indicators looks the same as one with six; the worst-color model ignores
+breadth entirely -- a cluster with one red and five orange sub-metrics reads
+the same as one with only the red one. This pack's composite **band** uses
+worst-color (so one red sub-metric always makes the object red, see item 6
+above); its composite **score** blends worst-color (70%) with weighted
+average (30%), so it gets the average's sensitivity to breadth without
+handing the *band* over to it.
+
+**Known limitation: a newly-known green sub-metric can lower the numeric
+score.** Unknown sub-metrics are excluded from the weighted-average term
+entirely (item 1), not counted at floor 0. So when a sub-metric that had no
+data starts reporting green, it adds a 0 to the numerator of the weighted
+average but still grows its denominator -- which *lowers* the average,
+and so the score, even though nothing got worse. The **band** is unaffected
+(green can never make the band worse), and this does not apply to a
+sub-metric in `EXCLUDED_WHEN_GREEN` (below), which never enters the
+weighted-average term at all while green. This is the same family of
+behavior documented for similar weighted-average models elsewhere (e.g. "a
+worse sub-metric can lower risk" in Iwan Rahabok's
+[e1-rahabok/VCF-vCommunity-Adapter](https://github.com/e1-rahabok/VCF-vCommunity-Adapter)
+docs) -- there, a sub-metric's *weight* itself depends on its own score,
+which this pack's model avoids (weights are fixed per metric, see
+`thresholds_*.py`), so a known sub-metric getting worse here only ever adds
+to the average, never shifts other weights. Only the unknown-to-green
+transition above has the counter-intuitive direction, and only on the score,
+never the band.
+
+### Excluded when green
+
+A few metrics say nothing useful when green: an overcommit ratio under 1
+just means "not overcommitted", and a cluster or host that is not busy is
+not a sign of good performance -- either way, counting it at floor 0 would
+add a free "everything's fine" vote to the weighted average every cycle,
+diluting a real problem elsewhere. So while one of these is green, it is
+left out of the weighted-average term entirely, the same as an unknown
+metric (`scoring.compute_composite`'s `excluded_when_green`); it still gets
+a real per-metric band and still counts toward the worst-band term, where
+green can only ever push *toward* green, never away from a worse band found
+elsewhere. If every known sub-metric ends up excluded this way, nothing is
+wrong: the composite is `0.0` / `"green"`, not `"unknown"`.
+
+| Metric key | Scope |
+|---|---|
+| `cpu_thread_utilization_pct` | cluster |
+| `host_cpu_thread_utilization_pct` | host |
+| `host_memory_consumed_pct` | host |
+| `host_cpu_reservation_pct` | host |
+| `host_memory_reservation_pct` | host |
+| `cluster_cpu_overcommit_ratio` | cluster |
+| `cluster_memory_overcommit_ratio` | cluster |
+| `host_cpu_overcommit_ratio` | host |
+| `host_memory_overcommit_ratio` | host |
+| `host_dropped_packets_pct` | both |
+
+New in this review: these are the same metrics, with the same green_max
+values, marked "Excluded" in Iwan Rahabok's e1-rahabok/VCF-vCommunity-Adapter
+Cluster Risk KPI table -- the matrix this pack's thresholds were originally
+transcribed from (see `thresholds_cluster.py`, `thresholds_host.py`,
+`thresholds_shared.py`). The green_max values themselves are unchanged.
+
 ---
 
 ## Thresholds

@@ -8,8 +8,11 @@ import adapter
 import constants_host
 import constants_native as cn
 import pytest
+from aria.ops.object import Key
+from aria.ops.object import Object
 from constants_cluster import BAND_PROPERTY_LABELS
 from constants_cluster import NATIVE_STATKEY_MAP
+from constants_shared import ADAPTER_KIND
 
 HERE = os.path.dirname(__file__)
 FIXTURES = os.path.join(HERE, "fixtures")
@@ -34,7 +37,15 @@ HOST_KEYS = {"h-uuid-1": rkey("esx01", "HostSystem", "host-1", "vc1"),
              "h-uuid-2": rkey("esx02", "HostSystem", "host-2", "vc2")}
 
 
-class FakeInstance:
+class FakeInstance(Object):
+    """A real Object (as the SDK's AdapterInstance is), so result.add_object()
+    and Collection Health's with_metric()/with_property() work the same as
+    on the real thing, plus the two test-only AdapterInstance methods used
+    here."""
+
+    def __init__(self):
+        super().__init__(Key(adapter_kind=ADAPTER_KIND, object_kind="adapter_instance", name="fake", identifiers=[]))
+
     def get_suite_api_client(self):
         c = mock.MagicMock()
         c.__enter__.return_value = c
@@ -72,12 +83,16 @@ def run_collect(keys=True, fail_cluster=None):
         return adapter.collect(FakeInstance())
 
 
-def test_pack_emits_no_objects_of_its_own_and_no_relationships():
+def test_pack_emits_no_vmware_objects_of_its_own_and_no_relationships():
+    # The adapter instance's own object (Collection Health) is the one
+    # exception -- see test_collection_health.py.
     js = run_collect().get_json()
     kinds = {(o["key"]["adapterKind"], o["key"]["objectKind"]) for o in js["result"]}
-    assert kinds == {("VMWARE", "ClusterComputeResource"), ("VMWARE", "HostSystem")}
+    assert kinds == {
+        ("VMWARE", "ClusterComputeResource"), ("VMWARE", "HostSystem"), (ADAPTER_KIND, "adapter_instance"),
+    }
     assert js["relationships"] == []
-    assert len(js["result"]) == 4
+    assert len(js["result"]) == 5
 
 
 def test_definition_has_no_object_types_and_no_flag():
@@ -90,7 +105,9 @@ def test_definition_has_no_object_types_and_no_flag():
 
 def test_external_objects_carry_only_prefixed_attributes_and_exact_counts():
     js = run_collect().get_json()
-    for o in js["result"]:
+    vmware_objects = [o for o in js["result"] if o["key"]["adapterKind"] == "VMWARE"]
+    assert len(vmware_objects) == 4
+    for o in vmware_objects:
         names = [m["key"] for m in o["metrics"]] + [p["key"] for p in o["properties"]]
         assert names and all(n.startswith(cn.NATIVE_ROOT + "|") for n in names)
         assert len(names) == len(set(names))
@@ -106,12 +123,15 @@ def test_external_objects_carry_only_prefixed_attributes_and_exact_counts():
 
 def test_one_failing_cluster_does_not_lose_the_others():
     js = run_collect(fail_cluster="c-uuid-1").get_json()
-    assert {o["key"]["name"] for o in js["result"]} == {"cl02", "esx02"}
+    vmware_names = {o["key"]["name"] for o in js["result"] if o["key"]["adapterKind"] == "VMWARE"}
+    assert vmware_names == {"cl02", "esx02"}
 
 
 def test_no_native_match_emits_nothing_and_does_not_crash():
+    # The adapter instance's own Collection Health object is still there.
     res = run_collect(keys=False)
-    assert res.get_json()["result"] == []
+    js = res.get_json()
+    assert [o["key"]["adapterKind"] for o in js["result"]] == [ADAPTER_KIND]
 
 
 def all_attr_names():

@@ -42,3 +42,20 @@ WEIGHTS = {
     HOST_METRIC_CPU_OVERCOMMIT_RATIO: 1.0,
     HOST_METRIC_MEMORY_OVERCOMMIT_RATIO: 1.0,
 }
+
+# Metric keys where green is not an informative signal -- see
+# scoring.compute_composite() and thresholds_cluster.EXCLUDED_WHEN_GREEN.
+# Matches the vSphere Cluster Performance Risk matrix this pack's thresholds
+# were transcribed from (Iwan Rahabok's e1-rahabok/VCF-vCommunity-Adapter
+# Cluster Risk KPI): CPU Thread Utilization Excluded below 60, Memory
+# Consumed Excluded below 80, CPU/Memory Reservation Excluded below 10,
+# CPU/Memory Overcommit Ratio Excluded below 1 -- the same green_max values
+# used here.
+EXCLUDED_WHEN_GREEN = frozenset({
+    HOST_METRIC_CPU_THREAD_UTILIZATION,
+    HOST_METRIC_MEMORY_CONSUMED,
+    HOST_METRIC_CPU_RESERVATION,
+    HOST_METRIC_MEMORY_RESERVATION,
+    HOST_METRIC_CPU_OVERCOMMIT_RATIO,
+    HOST_METRIC_MEMORY_OVERCOMMIT_RATIO,
+})

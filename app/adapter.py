@@ -3,8 +3,9 @@
 #  stats, classifies each into the risk-matrix bands, and writes a composite
 #  0-100 risk score + band, plus the underlying metrics, as write-only
 #  "Performance Risk|<Group>|<Label>" attributes onto the existing VMWARE
-#  ClusterComputeResource and HostSystem objects. The pack defines and emits no
-#  objects of its own.
+#  ClusterComputeResource and HostSystem objects. The pack defines no object
+#  types of its own; the only object it writes onto that it does own is the
+#  adapter instance itself, for Collection Health (see collection_health.py).
 #
 #  This file is intentionally thin -- it's just the four SDK entry points
 #  (test/collect/get_endpoints/get_adapter_definition) plus main(). Scoring lives
@@ -19,6 +20,7 @@ import aria.ops.adapter_logging as logging
 import cluster
 import host
 import native_projection
+from collection_health import CollectionHealth
 from aria.ops.adapter_instance import AdapterInstance
 from aria.ops.definition.adapter_definition import AdapterDefinition
 from aria.ops.result import CollectResult
@@ -99,7 +101,9 @@ def get_adapter_definition() -> AdapterDefinition:
         # No credential type and no object types are defined here. This adapter
         # is self-referential: AdapterInstance.get_suite_api_client() returns an
         # authenticated client for the VCF Operations instance hosting this
-        # adapter, and all output goes onto objects owned by the VMWARE adapter.
+        # adapter. Every risk metric goes onto objects owned by the VMWARE
+        # adapter; the adapter instance's own, already-identified object gets
+        # only Collection Health (collection_health.py).
 
         logger.debug(f"Returning adapter definition: {definition.to_json()}")
         return definition
@@ -127,6 +131,7 @@ def collect(adapter_instance: AdapterInstance) -> CollectResult:
                 "No Suite API client available. This adapter must run on a "
                 "Cloud Proxy with access to its own VCF Operations instance."
             )
+            _publish_collection_health(result, adapter_instance, CollectionHealth())
             return result
 
         monster = MonsterVmSettings(
@@ -136,8 +141,9 @@ def collect(adapter_instance: AdapterInstance) -> CollectResult:
         )
 
         CALL_STATS.reset()
+        health = CollectionHealth()
         try:
-            with client:
+            with health, client:
                 started = time.monotonic()
                 clusters = fetch_resources(client, RESOURCE_KIND_CLUSTER, VMWARE_ADAPTER_KIND)
                 cluster_keys = fetch_resource_keys(client, RESOURCE_KIND_CLUSTER, VMWARE_ADAPTER_KIND)
@@ -217,6 +223,7 @@ def collect(adapter_instance: AdapterInstance) -> CollectResult:
         finally:
             logger.info(CALL_STATS.summary())
 
+        _publish_collection_health(result, adapter_instance, health)
         return result
 
 
@@ -234,6 +241,28 @@ def _number_setting(
         logger.warning(f"Invalid {key} value {raw!r}, using the default {default}")
         return default
     return value
+
+
+def _publish_collection_health(
+    result: CollectResult, adapter_instance: AdapterInstance, health: CollectionHealth
+) -> None:
+    """Writes Collection Health|Warnings in Last Cycle (metric) and, if there
+    were any, Collection Health|First Warning (property) onto the adapter
+    instance object -- this adapter owns no VMWARE object to put them on,
+    but the adapter instance is itself a real, already-identified Object.
+    Lets an operator without adapter.log access see that a cycle had
+    problems, and a hint of what, straight from the account.
+
+    Only reaches VCF Operations when the cycle did not call result.with_error():
+    CollectResult.get_json() returns just {"errorMessage": ...} once that is
+    set, dropping every object including this one. That is fine -- a hard
+    failure is already visible through the error message itself; Collection
+    Health covers the partial, non-fatal case that would otherwise only show
+    in adapter.log."""
+    adapter_instance.with_metric("Collection Health|Warnings in Last Cycle", health.count)
+    if health.first:
+        adapter_instance.with_property("Collection Health|First Warning", health.first)
+    result.add_object(adapter_instance)
 
 
 def _report_failures(

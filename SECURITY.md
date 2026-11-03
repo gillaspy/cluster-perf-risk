@@ -10,17 +10,33 @@ latest release to pick up security fixes.
 
 ## Reporting a vulnerability
 
-Please report suspected vulnerabilities privately, not in a public issue or
-pull request: email **tom.gillaspy@gmail.com** with a description of the
-issue, how to reproduce it, and its impact. You should get an acknowledgement
-within a few days. Once a fix is available it will ship in a new release and
-be noted in that release's notes; please give a reasonable amount of time to
-release a fix before any public disclosure.
+**Do not open a public issue or pull request for a vulnerability.**
 
-This does not apply to vulnerabilities in third-party dependencies
-(`cryptography`, `urllib3`, the VMware Aria Operations Integration SDK,
-etc.) — report those upstream. `.trivyignore.yaml` documents the dependency
-findings this repository is already tracking and cannot fix itself.
+Use GitHub's private report: open the **Security** tab of this repository,
+choose **Report a vulnerability**, and describe what you found, the file or
+setting it is in, how to reproduce it, and what an attacker gains.
+
+If the **Report a vulnerability** button is not shown, private reporting is
+not enabled on this repository yet; email **tom.gillaspy@gmail.com** instead,
+with the same information.
+
+Either way, you should get an acknowledgement within a few days. Once a fix
+is available it will ship in a new release and be noted in that release's
+notes; please give a reasonable amount of time to release a fix before any
+public disclosure.
+
+## What is in scope
+
+- The adapter code in `app/`: how it handles the Suite API session token,
+  what it logs, and the composite scoring itself.
+- The container image and how it is built, scanned, signed and published
+  (`Dockerfile`, `.github/workflows/build-and-publish.yml`).
+
+Out of scope: a vulnerability in VCF Operations, vCenter, ESXi, or the
+VMware Aria Operations Integration SDK itself (`cryptography`, `urllib3`,
+etc. included) — report those upstream. `.trivyignore.yaml` documents the
+dependency findings this repository is already tracking and cannot fix
+itself.
 
 ## Supply chain: what's signed and scanned
 
