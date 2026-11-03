@@ -21,7 +21,7 @@ These rules apply to every metric below.
 - **Powered-on VMs only.** A VM counts only when its property
   `summary|runtime|powerState` is `Powered On`; a VM without that property
   does not count. Powered-off VMs are left out of the worst/P90 samples, the
-  vCPU and memory totals, overcommit and the monster VM counts. Their stats
+  vCPU and memory totals, overcommit and the monster VM ratios. Their stats
   are not even read.
 - **Stale stats are no data.** A stat whose latest sample is more than
   `STALE_AFTER_MINUTES` (10, two collection cycles) older than the newest
@@ -64,9 +64,10 @@ existing relationships (cluster -> hosts) are native and untouched.
 | `cluster_memory_overcommit_ratio` | Cluster Memory Overcommit Ratio | Cluster-level native statkey `mem\|virtual_to_physical_memory_allocation_ratio` (ClusterComputeResource-only) |
 | `memory_ballooned_pct` | Memory Ballooned Pct | Per host: (`mem\|vmmemctl_average` KB ÷ host DRAM KB) × 100; result is the MAX across the cluster's hosts |
 | `network_throughput_pct` | Network Throughput Pct | Per host: (`net\|usage_average` KBps × 8 ÷ 1000 → Mbps) ÷ `config\|network\|linkspeed` (Mbps, a resource property) × 100; result is the MAX across the cluster's hosts |
-| `highest_host_cpu_imbalance_pct` | Highest ESXi CPU Imbalance Pct | Population standard deviation (`statistics.pstdev`) of `cpu\|utilization_average` across the cluster's hosts (requires ≥2 hosts with data) — a synthetic proxy; no native per-host imbalance statkey exists |
-| `cluster_cpu_monster_vm_ratio` | Cluster CPU Monster VM Ratio | (count of powered-on VMs in the cluster whose vCPU count exceeds `monster_vm_threshold_pct`% of their host's total cores) ÷ host count |
-| `cluster_memory_monster_vm_ratio` | Cluster Memory Monster VM Ratio | (count of powered-on VMs in the cluster whose memory exceeds `monster_vm_threshold_pct`% of their host's DRAM) ÷ host count |
+| `host_cpu_imbalance_ratio` | Host CPU Imbalance Ratio | MAX across the cluster's hosts of the host value (see host scope) |
+| `cpu_monster_vm_size_ratio` | CPU Monster VM Size Ratio | MAX across the cluster's hosts of the host value (see host scope) |
+| `memory_monster_vm_size_ratio` | Memory Monster VM Size Ratio | MAX across the cluster's hosts of the host value (see host scope) |
+| `host_memory_zip_swap_pct` | Host Zip Swap Pct | MAX across the cluster's hosts of the host value (see host scope) |
 | `vmotion_pct` | vMotion Pct | `summary\|number_vmotion` ÷ (`summary\|vm_count_per_host` × host count) × 100 |
 | `worst_vcpu_ready_pct` | Worst vCPU Ready Pct | MAX of `cpu\|20_sec_peak_readyPct` across every powered-on VM in the cluster |
 | `p90_vcpu_ready_pct` | P90 vCPU Ready Pct | 90th percentile (nearest-rank) of the same cluster-wide VM sample set |
@@ -91,13 +92,16 @@ The native host object is matched by its Suite API `resourceKey`.
 | Metric key | Label | Formula |
 |---|---|---|
 | `host_cpu_thread_utilization_pct` | CPU Thread Utilization Pct | This host's own native statkey `cpu\|utilization_average` |
-| `host_memory_consumed_pct` | Memory Consumed Pct | This host's own native statkey `mem\|usage_average` (already a %) |
+| `host_memory_consumed_pct` | Memory Consumed Pct | This host's own native statkey `mem\|usage_average` (already a %). On a host with memory tiering it is consumed ÷ (DRAM + NVMe tier), not ÷ DRAM: VCF Operations has no DRAM-tier consumed stat with data, and consumed ÷ DRAM exceeds 100% by design on a tiered host (192% on a lab host) |
 | `host_memory_ballooned_pct` | Memory Ballooned Pct | (`mem\|vmmemctl_average` KB ÷ host DRAM KB) × 100, this host only |
-| `host_cpu_reservation_pct` | CPU Reservation Pct | (`cpu\|reservedCapacity_average` MHz ÷ `cpu\|capacity_provisioned` MHz) × 100 |
+| `host_cpu_reservation_pct` | CPU Reservation Pct | (`cpu\|reservedCapacity_average` MHz ÷ `cpu\|totalCapacity_average` MHz, the capacity available to VMs) × 100. Before 2.2.0 the denominator was `cpu\|capacity_provisioned`, about 1.66× larger on the lab |
 | `host_memory_reservation_pct` | Memory Reservation Pct | This host's own native statkey `mem\|reservedCapacityPct` (already a %) |
 | `host_cpu_overcommit_ratio` | CPU Overcommit Ratio | vCPUs of this host's powered-on VMs (`cpu\|vcpus_allocated_on_all_powered_on_vms`, or the sum of their `config\|hardware\|num_Cpu` when that has no value) ÷ this host's core count (`hardware\|cpuInfo\|num_CpuCores`) |
 | `host_memory_overcommit_ratio` | Memory Overcommit Ratio | Memory KB of this host's powered-on VMs (`mem\|memory_allocated_on_all_powered_on_vms`, or the sum of their `mem\|guest_provisioned`) ÷ this host's DRAM KB |
-| `host_monster_vm_count` | Monster VM Count | Count of powered-on VMs on this host whose vCPU count exceeds `monster_vm_threshold_pct`% of the host's cores, OR whose memory exceeds `monster_vm_threshold_pct`% of the host's DRAM |
+| `cpu_monster_vm_size_ratio` | CPU Monster VM Size Ratio | vCPUs of this host's largest powered-on VM ÷ the host's CPU monster size (`monster_vm_threshold_pct`% of its cores, default 50). 1 is exactly the monster size; 0 with no powered-on VMs |
+| `memory_monster_vm_size_ratio` | Memory Monster VM Size Ratio | Memory of this host's largest powered-on VM ÷ the host's memory monster size (`monster_vm_memory_pct`% of its DRAM, default 40, at most `monster_vm_memory_cap_gb`, default 256 GB) |
+| `host_cpu_imbalance_ratio` | Host CPU Imbalance Ratio | Running threads ÷ running cores: (`cpu\|utilization_average`% × threads) ÷ (`cpu\|coreUtilization_average`% × cores). Threads are 2 × cores when the properties `config\|hyperThread\|available` and `\|active` are both `true`. 1 is one running thread per running core; an idle host is 1 |
+| `host_memory_zip_swap_pct` | Host Zip Swap Pct | (`mem\|compressed_average` KB + `mem\|swapout_average` KB) ÷ host DRAM KB × 100 |
 | `worst_vcpu_ready_pct` | Worst vCPU Ready Pct | MAX of `cpu\|20_sec_peak_readyPct` across this host's own powered-on VMs |
 | `p90_vcpu_ready_pct` | P90 vCPU Ready Pct | P90 (nearest-rank) of the same per-host VM sample set |
 | `worst_vcpu_costop_pct` | Worst vCPU Co-Stop Pct | MAX of `cpu\|20_sec_peak_costopPct` across this host's own powered-on VMs |
@@ -116,7 +120,8 @@ composite score itself) are also published.
 Eight metric keys (`worst_vcpu_ready_pct`, `p90_vcpu_ready_pct`,
 `worst_vcpu_costop_pct`, `p90_vcpu_costop_pct`, `worst_memory_contention_pct`,
 `p90_memory_contention_pct`, `worst_disk_latency_ms`, `p90_disk_latency_ms`,
-plus `host_memory_contention_pct`/`host_dropped_packets_pct`) reuse the exact
+plus `host_memory_contention_pct`/`host_dropped_packets_pct`, and since 2.2.0
+the zip swap, imbalance and monster VM size ratios) reuse the exact
 same metric key as the cluster scope — same key, computed at a different
 scope (this host's VMs only vs. the whole cluster's VMs).
 
@@ -182,17 +187,18 @@ orange, above that red. Pinned by `tests/test_threshold_tables.py`.
 | `p90_disk_latency_ms` | both | 20 | 40 | 60 |
 | `host_memory_contention_pct` | both | 0.25 | 0.5 | 1 |
 | `host_dropped_packets_pct` | both | 0 | 0.2 | 0.4 |
+| `host_memory_zip_swap_pct` | both | 0.25 | 0.5 | 1 |
+| `host_cpu_imbalance_ratio` | both | 1.2 | 1.4 | 1.6 |
+| `cpu_monster_vm_size_ratio` | both | 1 | 2 | 3 |
+| `memory_monster_vm_size_ratio` | both | 1 | 2 | 3 |
 | `cpu_thread_utilization_pct` | cluster | 60 | 80 | 90 |
 | `memory_ballooned_pct` | cluster | 1 | 2 | 4 |
 | `network_throughput_pct` | cluster | 1 | 2 | 4 |
 | `disk_iops` | cluster | 25000 | 50000 | 100000 |
-| `highest_host_cpu_imbalance_pct` | cluster | 5 | 10 | 20 |
 | `cluster_cpu_imbalance` | cluster | 0.05 | 0.08 | 0.12 |
 | `vmotion_pct` | cluster | 1 | 2 | 4 |
 | `cluster_cpu_overcommit_ratio` | cluster | 1 | 2 | 3 |
 | `cluster_memory_overcommit_ratio` | cluster | 1 | 1.25 | 1.5 |
-| `cluster_cpu_monster_vm_ratio` | cluster | 1 | 2 | 4 |
-| `cluster_memory_monster_vm_ratio` | cluster | 1 | 2 | 4 |
 | `host_cpu_thread_utilization_pct` | host | 60 | 80 | 90 |
 | `host_memory_consumed_pct` | host | 80 | 90 | 95 |
 | `host_memory_ballooned_pct` | host | 1 | 2 | 4 |
@@ -200,7 +206,11 @@ orange, above that red. Pinned by `tests/test_threshold_tables.py`.
 | `host_memory_reservation_pct` | host | 10 | 40 | 60 |
 | `host_cpu_overcommit_ratio` | host | 1 | 2 | 3 |
 | `host_memory_overcommit_ratio` | host | 1 | 1.4 | 1.8 |
-| `host_monster_vm_count` | host | 0 | 1 | 2 |
+
+New in 2.2.0: `host_memory_zip_swap_pct`, `host_cpu_imbalance_ratio`
+(replaces `highest_host_cpu_imbalance_pct`, 5/10/20), `cpu_monster_vm_size_ratio`
+and `memory_monster_vm_size_ratio` (replace `cluster_cpu_monster_vm_ratio`,
+`cluster_memory_monster_vm_ratio`, 1/2/4, and `host_monster_vm_count`, 0/1/2).
 
 Changed in 2.1.0: `p90_vcpu_costop_pct` (was 1/2/4), `memory_ballooned_pct`
 (was 1/1.25/2), `host_memory_overcommit_ratio` (was 1/1.4/1.6),
@@ -210,18 +220,19 @@ Changed in 2.1.0: `p90_vcpu_costop_pct` (was 1/2/4), `memory_ballooned_pct`
 
 ## Notes
 
-- `monster_vm_threshold_pct` (default `50`) is a user-configurable adapter
-  parameter — a VM counts as a "monster VM" when its vCPU count or memory
-  exceeds that percentage of its host's total cores/DRAM (a proxy for
-  "may not fit in one NUMA node"; NUMA topology itself is not exposed via
-  SuiteAPI).
+- Monster VM settings (adapter instance, Advanced): **Monster VM CPU (% of
+  host cores)** (`monster_vm_threshold_pct`, default 50, 1-100), **Monster VM
+  Memory (% of host DRAM)** (`monster_vm_memory_pct`, default 40, 1-100) and
+  **Monster VM Memory Cap (GB)** (`monster_vm_memory_cap_gb`, default 256). A
+  VM above its host's monster size is a proxy for "may not fit in one NUMA
+  node"; NUMA topology itself is not exposed via SuiteAPI. An empty or
+  invalid value uses the default and logs a warning.
 - All VM-level "worst"/"p90" pairs use nearest-rank percentile (not
   interpolated), chosen for transparency at the small VM-count sample sizes
   typical of a single cluster or host.
 - Several formulas are substitutes for statkeys that exist in the original
   risk-matrix design but are not monitored on real vSphere/VCF Operations
-  instances (e.g. memory contention in place of memory latency, host memory
-  contention in place of a swap%+compressed% derivation) — see the inline
+  instances (e.g. memory contention in place of memory latency) — see the inline
   comments in `constants_shared.py` and `constants_cluster.py` for the full
   investigation history behind each substitution.
 
@@ -248,15 +259,16 @@ Attributes are written to the native object of the matching scope under
 | Cluster | `host_dropped_packets_pct` | `Performance Risk|Network|Host Dropped Packets Pct` |
 | Cluster | `cpu_thread_utilization_pct` | `Performance Risk|CPU|Max Host Thread Utilization Pct` |
 | Cluster | `cluster_cpu_overcommit_ratio` | `Performance Risk|CPU|Overcommit Ratio` |
-| Cluster | `cluster_cpu_monster_vm_ratio` | `Performance Risk|CPU|Monster VM Ratio` |
-| Cluster | `highest_host_cpu_imbalance_pct` | `Performance Risk|Balance|Host CPU Imbalance Pct` |
 | Cluster | `cluster_cpu_imbalance` | `Performance Risk|Balance|DRS CPU Imbalance` |
 | Cluster | `vmotion_pct` | `Performance Risk|Balance|vMotion Pct` |
 | Cluster | `memory_ballooned_pct` | `Performance Risk|Memory|Max Host Ballooned Pct` |
 | Cluster | `cluster_memory_overcommit_ratio` | `Performance Risk|Memory|Overcommit Ratio` |
-| Cluster | `cluster_memory_monster_vm_ratio` | `Performance Risk|Memory|Monster VM Ratio` |
 | Cluster | `network_throughput_pct` | `Performance Risk|Network|Max Host Throughput Pct` |
 | Cluster | `disk_iops` | `Performance Risk|Storage|Max Host Disk IOPS` |
+| Cluster, Host | `host_memory_zip_swap_pct` | `Performance Risk|Memory|Host Zip Swap Pct` |
+| Cluster, Host | `host_cpu_imbalance_ratio` | `Performance Risk|Balance|Host CPU Imbalance Ratio` |
+| Cluster, Host | `cpu_monster_vm_size_ratio` | `Performance Risk|CPU|Monster VM Size Ratio` |
+| Cluster, Host | `memory_monster_vm_size_ratio` | `Performance Risk|Memory|Monster VM Size Ratio` |
 | Host | `worst_vcpu_ready_pct` | `Performance Risk|Contention|Worst vCPU Ready Pct` |
 | Host | `p90_vcpu_ready_pct` | `Performance Risk|Contention|P90 vCPU Ready Pct` |
 | Host | `worst_vcpu_costop_pct` | `Performance Risk|Contention|Worst vCPU Co-Stop Pct` |
@@ -270,7 +282,6 @@ Attributes are written to the native object of the matching scope under
 | Host | `host_cpu_thread_utilization_pct` | `Performance Risk|CPU|Thread Utilization Pct` |
 | Host | `host_cpu_reservation_pct` | `Performance Risk|CPU|Reservation Pct` |
 | Host | `host_cpu_overcommit_ratio` | `Performance Risk|CPU|Overcommit Ratio` |
-| Host | `host_monster_vm_count` | `Performance Risk|CPU|Monster VM Count` |
 | Host | `host_memory_consumed_pct` | `Performance Risk|Memory|Consumed Pct` |
 | Host | `host_memory_ballooned_pct` | `Performance Risk|Memory|Ballooned Pct` |
 | Host | `host_memory_reservation_pct` | `Performance Risk|Memory|Reservation Pct` |

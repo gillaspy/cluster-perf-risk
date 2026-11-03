@@ -30,7 +30,11 @@ from constants_native import CLUSTER_PROJECTION
 from constants_native import HOST_PROJECTION
 from constants_shared import ADAPTER_KIND
 from constants_shared import ADAPTER_NAME
+from constants_shared import DEFAULT_MONSTER_VM_MEMORY_CAP_GB
+from constants_shared import DEFAULT_MONSTER_VM_MEMORY_PCT
 from constants_shared import DEFAULT_MONSTER_VM_THRESHOLD_PCT
+from constants_shared import PARAM_MONSTER_VM_MEMORY_CAP_GB
+from constants_shared import PARAM_MONSTER_VM_MEMORY_PCT
 from constants_shared import PARAM_MONSTER_VM_THRESHOLD_PCT
 from constants_shared import RESOURCE_KIND_CLUSTER
 from constants_shared import RESOURCE_KIND_HOST
@@ -39,6 +43,7 @@ from suite_api import CALL_STATS
 from suite_api import SuiteApiError
 from suite_api import fetch_resource_keys
 from suite_api import fetch_resources
+from traversal import MonsterVmSettings
 from traversal import collect_cluster_and_host_metrics
 from traversal import fetch_cluster_snapshot
 
@@ -58,16 +63,37 @@ def get_adapter_definition() -> AdapterDefinition:
             advanced=True,
             default=1024,
         )
+        # A VM is a monster when it is larger than its host's monster size --
+        # a proxy for VMs that may not fit in one NUMA node. The first key
+        # predates 2.2.0, when it applied to memory as well.
         definition.define_int_parameter(
             PARAM_MONSTER_VM_THRESHOLD_PCT,
-            label="Monster VM Threshold (%)",
-            description="A VM counts as a CPU (or memory) monster VM when its "
-            "vCPU count (or memory) exceeds this percentage of its host's "
-            "total CPU cores (or memory) -- a proxy for VMs that may not fit "
-            "in one NUMA node.",
+            label="Monster VM CPU (% of host cores)",
+            description="A VM is a CPU monster when its vCPUs exceed this "
+            "percentage of its host's physical cores (cores, not threads). "
+            "1 to 100.",
             required=False,
             advanced=True,
             default=DEFAULT_MONSTER_VM_THRESHOLD_PCT,
+        )
+        definition.define_int_parameter(
+            PARAM_MONSTER_VM_MEMORY_PCT,
+            label="Monster VM Memory (% of host DRAM)",
+            description="A VM is a memory monster when its memory exceeds "
+            "this percentage of its host's DRAM, or Monster VM Memory Cap, "
+            "whichever is smaller. 1 to 100.",
+            required=False,
+            advanced=True,
+            default=DEFAULT_MONSTER_VM_MEMORY_PCT,
+        )
+        definition.define_int_parameter(
+            PARAM_MONSTER_VM_MEMORY_CAP_GB,
+            label="Monster VM Memory Cap (GB)",
+            description="The largest memory monster size, whatever the "
+            "host's DRAM. 1 or more.",
+            required=False,
+            advanced=True,
+            default=DEFAULT_MONSTER_VM_MEMORY_CAP_GB,
         )
 
         # No credential type and no object types are defined here. This adapter
@@ -103,17 +129,11 @@ def collect(adapter_instance: AdapterInstance) -> CollectResult:
             )
             return result
 
-        threshold_str = adapter_instance.get_identifier_value(
-            PARAM_MONSTER_VM_THRESHOLD_PCT, str(DEFAULT_MONSTER_VM_THRESHOLD_PCT)
+        monster = MonsterVmSettings(
+            cpu_pct=_number_setting(adapter_instance, PARAM_MONSTER_VM_THRESHOLD_PCT, DEFAULT_MONSTER_VM_THRESHOLD_PCT, 1, 100),
+            memory_pct=_number_setting(adapter_instance, PARAM_MONSTER_VM_MEMORY_PCT, DEFAULT_MONSTER_VM_MEMORY_PCT, 1, 100),
+            memory_cap_gb=_number_setting(adapter_instance, PARAM_MONSTER_VM_MEMORY_CAP_GB, DEFAULT_MONSTER_VM_MEMORY_CAP_GB, 1, None),
         )
-        try:
-            monster_vm_threshold_pct = float(threshold_str)
-        except (TypeError, ValueError):
-            logger.warning(
-                f"Invalid {PARAM_MONSTER_VM_THRESHOLD_PCT} value {threshold_str!r}, "
-                f"falling back to default {DEFAULT_MONSTER_VM_THRESHOLD_PCT}"
-            )
-            monster_vm_threshold_pct = DEFAULT_MONSTER_VM_THRESHOLD_PCT
 
         CALL_STATS.reset()
         try:
@@ -137,7 +157,7 @@ def collect(adapter_instance: AdapterInstance) -> CollectResult:
                         snap = fetch_cluster_snapshot(client, cluster_id)
                         metric_values = cluster.gather_metric_values(snap)
                         cluster_vm_metrics, host_records = collect_cluster_and_host_metrics(
-                            snap, monster_vm_threshold_pct
+                            snap, monster
                         )
                         metric_values.update(cluster_vm_metrics)
                         total_hosts += len(host_records)
@@ -198,6 +218,22 @@ def collect(adapter_instance: AdapterInstance) -> CollectResult:
             logger.info(CALL_STATS.summary())
 
         return result
+
+
+def _number_setting(
+    adapter_instance: AdapterInstance, key: str, default: float, low: float, high: float | None
+) -> float:
+    """A numeric adapter instance setting; empty, invalid or out of range is
+    the default, with a warning."""
+    raw = adapter_instance.get_identifier_value(key, str(default))
+    try:
+        value = float(raw)
+    except (TypeError, ValueError):
+        value = None
+    if value is None or value < low or (high is not None and value > high):
+        logger.warning(f"Invalid {key} value {raw!r}, using the default {default}")
+        return default
+    return value
 
 
 def _report_failures(

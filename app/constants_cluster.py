@@ -4,8 +4,12 @@ as-is on the host object too (worst/p90 VM metrics, host memory
 contention/dropped packets) live in constants_shared.py instead.
 """
 from constants_shared import CPU_UTILIZATION_STATKEY
+from constants_shared import METRIC_CPU_MONSTER_VM_SIZE_RATIO
+from constants_shared import METRIC_HOST_CPU_IMBALANCE_RATIO
 from constants_shared import METRIC_HOST_DROPPED_PACKETS
 from constants_shared import METRIC_HOST_MEMORY_CONTENTION
+from constants_shared import METRIC_HOST_MEMORY_ZIP_SWAP
+from constants_shared import METRIC_MEMORY_MONSTER_VM_SIZE_RATIO
 from constants_shared import METRIC_P90_DISK_LATENCY
 from constants_shared import METRIC_P90_MEMORY_CONTENTION
 from constants_shared import METRIC_P90_VCPU_COSTOP
@@ -19,28 +23,19 @@ from constants_shared import METRIC_WORST_VCPU_READY
 
 # Metric keys. NOTE: the matrix's two separate imbalance rows ("Highest ESXi
 # CPU Imbalance" and "Cluster CPU Imbalance") are tracked as two distinct
-# metrics. No per-host imbalance statkey exists on the live instance, so
-# METRIC_HOST_CPU_IMBALANCE is a synthetic proxy -- population stdev of
-# cpu|utilization_average across the cluster's hosts, in percentage points --
-# computed in cluster.py's host_cpu_imbalance_pct(), not a real vSphere/DRS
-# statkey. METRIC_CLUSTER_CPU_IMBALANCE remains the real DRS statkey
-# (clusterServices|total_imbalance).
+# metrics. Since 2.2.0 the first is METRIC_HOST_CPU_IMBALANCE_RATIO
+# (constants_shared.py, running threads per running core, worst host); the
+# stdev-across-hosts stand-in it replaces is gone. METRIC_CLUSTER_CPU_IMBALANCE
+# remains the real DRS statkey (clusterServices|total_imbalance).
 METRIC_CPU_THREAD_UTILIZATION = "cpu_thread_utilization_pct"
 METRIC_MEMORY_BALLOONED = "memory_ballooned_pct"
 METRIC_NETWORK_THROUGHPUT = "network_throughput_pct"
 METRIC_DISK_IOPS = "disk_iops"
-METRIC_HOST_CPU_IMBALANCE = "highest_host_cpu_imbalance_pct"
 METRIC_CLUSTER_CPU_IMBALANCE = "cluster_cpu_imbalance"
 METRIC_VMOTION_PCT = "vmotion_pct"
 
-# 2026-08-17: replaced the cluster-scope raw monster-VM counts with
-# ratio-to-host-count metrics (see METRIC_CLUSTER_CPU_MONSTER_VM_RATIO /
-# METRIC_CLUSTER_MEMORY_MONSTER_VM_RATIO below) -- host scope keeps a raw
-# count instead (HOST_METRIC_MONSTER_VM_COUNT in constants_host.py).
 METRIC_CLUSTER_CPU_OVERCOMMIT_RATIO = "cluster_cpu_overcommit_ratio"
 METRIC_CLUSTER_MEMORY_OVERCOMMIT_RATIO = "cluster_memory_overcommit_ratio"
-METRIC_CLUSTER_CPU_MONSTER_VM_RATIO = "cluster_cpu_monster_vm_ratio"
-METRIC_CLUSTER_MEMORY_MONSTER_VM_RATIO = "cluster_memory_monster_vm_ratio"
 
 
 # Sub-metrics that are already cluster-level (no per-host "highest" rollup needed)
@@ -58,9 +53,6 @@ BAND_PROPERTY_LABELS = {
     f"band_{METRIC_DISK_IOPS}": "Disk IOPS Band",
     f"band_{METRIC_CLUSTER_CPU_OVERCOMMIT_RATIO}": "Cluster CPU Overcommit Ratio Band",
     f"band_{METRIC_CLUSTER_MEMORY_OVERCOMMIT_RATIO}": "Cluster Memory Overcommit Ratio Band",
-    f"band_{METRIC_CLUSTER_CPU_MONSTER_VM_RATIO}": "Cluster CPU Monster VM Ratio Band",
-    f"band_{METRIC_CLUSTER_MEMORY_MONSTER_VM_RATIO}": "Cluster Memory Monster VM Ratio Band",
-    f"band_{METRIC_HOST_CPU_IMBALANCE}": "Highest ESXi CPU Imbalance Band",
     f"band_{METRIC_CLUSTER_CPU_IMBALANCE}": "Cluster CPU Imbalance Band",
     f"band_{METRIC_VMOTION_PCT}": "vMotion Pct Band",
     f"band_{METRIC_WORST_VCPU_READY}": "Worst vCPU Ready Band",
@@ -73,13 +65,17 @@ BAND_PROPERTY_LABELS = {
     f"band_{METRIC_P90_DISK_LATENCY}": "P90 Disk Latency Band",
     f"band_{METRIC_HOST_MEMORY_CONTENTION}": "Host Memory Contention Band",
     f"band_{METRIC_HOST_DROPPED_PACKETS}": "Host Dropped Packets Band",
+    f"band_{METRIC_HOST_MEMORY_ZIP_SWAP}": "Host Zip Swap Band",
+    f"band_{METRIC_HOST_CPU_IMBALANCE_RATIO}": "Host CPU Imbalance Ratio Band",
+    f"band_{METRIC_CPU_MONSTER_VM_SIZE_RATIO}": "CPU Monster VM Size Ratio Band",
+    f"band_{METRIC_MEMORY_MONSTER_VM_SIZE_RATIO}": "Memory Monster VM Size Ratio Band",
 }
 
 # Confirmed directly against ops.vcf.gillaspy.org via
 # /api/adapterkinds/VMWARE/resourcekinds/{HostSystem,ClusterComputeResource}/statkeys.
 # There's no native "monster VM" statkey (confirmed absent from the live
 # catalog, and NUMA topology isn't exposed via SuiteAPI) -- monster VM
-# counts/ratios are computed in traversal.py as a per-VM proxy instead, in the
+# size ratios are computed in traversal.py as a per-VM proxy instead, in the
 # same traversal that computes the worst/p90 VM metrics, so neither appears in
 # this map.
 NATIVE_STATKEY_MAP = {

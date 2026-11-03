@@ -84,7 +84,8 @@ def test_definition_has_no_object_types_and_no_flag():
     d = adapter.get_adapter_definition().to_json()
     assert not d.get("object_types")
     assert {i["key"] for i in d["adapter_instance"]["identifiers"]} == {
-        "container_memory_limit", "monster_vm_threshold_pct"}
+        "container_memory_limit", "monster_vm_threshold_pct", "monster_vm_memory_pct",
+        "monster_vm_memory_cap_gb"}
 
 
 def test_external_objects_carry_only_prefixed_attributes_and_exact_counts():

@@ -11,7 +11,6 @@ from constants_host import HOST_METRIC_MEMORY_BALLOONED
 from constants_host import HOST_METRIC_MEMORY_CONSUMED
 from constants_host import HOST_METRIC_MEMORY_OVERCOMMIT_RATIO
 from constants_host import HOST_METRIC_MEMORY_RESERVATION
-from constants_host import HOST_METRIC_MONSTER_VM_COUNT
 
 # Each entry: green_max, yellow_max, orange_max. Anything above orange_max is red.
 # 2026-08-17 net-new, alongside the host scope.
@@ -30,7 +29,6 @@ BAND_BOUNDS = {
     HOST_METRIC_CPU_OVERCOMMIT_RATIO: {"green_max": 1, "yellow_max": 2, "orange_max": 3},
     # 2.1.0: orange_max 1.6 -> 1.8.
     HOST_METRIC_MEMORY_OVERCOMMIT_RATIO: {"green_max": 1, "yellow_max": 1.4, "orange_max": 1.8},
-    HOST_METRIC_MONSTER_VM_COUNT: {"green_max": 0, "yellow_max": 1, "orange_max": 2},
 }
 
 # Starting weights, not calibrated against real incidents yet -- same caveat
@@ -43,5 +41,4 @@ WEIGHTS = {
     HOST_METRIC_MEMORY_RESERVATION: 0.75,
     HOST_METRIC_CPU_OVERCOMMIT_RATIO: 1.0,
     HOST_METRIC_MEMORY_OVERCOMMIT_RATIO: 1.0,
-    HOST_METRIC_MONSTER_VM_COUNT: 1.25,
 }
