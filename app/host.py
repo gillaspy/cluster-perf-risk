@@ -14,8 +14,9 @@ import thresholds_shared
 # and the ones it shares with the cluster object.
 BAND_BOUNDS = {**thresholds_shared.BAND_BOUNDS, **thresholds_host.BAND_BOUNDS}
 WEIGHTS = {**thresholds_shared.WEIGHTS, **thresholds_host.WEIGHTS}
+EXCLUDED_WHEN_GREEN = thresholds_shared.EXCLUDED_WHEN_GREEN | thresholds_host.EXCLUDED_WHEN_GREEN
 
 
 def score(host_metric_values: dict[str, Optional[float]]) -> tuple:
     """Returns (composite_score, composite_band, {metric_key: band})."""
-    return scoring.compute_composite(host_metric_values, BAND_BOUNDS, WEIGHTS)
+    return scoring.compute_composite(host_metric_values, BAND_BOUNDS, WEIGHTS, EXCLUDED_WHEN_GREEN)

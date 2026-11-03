@@ -28,6 +28,7 @@ from traversal import host_memory_capacity_kb
 # and the ones it shares with the host object.
 BAND_BOUNDS = {**thresholds_shared.BAND_BOUNDS, **thresholds_cluster.BAND_BOUNDS}
 WEIGHTS = {**thresholds_shared.WEIGHTS, **thresholds_cluster.WEIGHTS}
+EXCLUDED_WHEN_GREEN = thresholds_shared.EXCLUDED_WHEN_GREEN | thresholds_cluster.EXCLUDED_WHEN_GREEN
 
 
 def gather_metric_values(snap: ClusterSnapshot) -> dict[str, Optional[float]]:
@@ -57,7 +58,7 @@ def gather_metric_values(snap: ClusterSnapshot) -> dict[str, Optional[float]]:
 
 def score(metric_values: dict[str, Optional[float]]) -> tuple:
     """Returns (composite_score, composite_band, {metric_key: band})."""
-    return scoring.compute_composite(metric_values, BAND_BOUNDS, WEIGHTS)
+    return scoring.compute_composite(metric_values, BAND_BOUNDS, WEIGHTS, EXCLUDED_WHEN_GREEN)
 
 
 def _highest_host_stat(snap: ClusterSnapshot, statkey: str) -> Optional[float]:

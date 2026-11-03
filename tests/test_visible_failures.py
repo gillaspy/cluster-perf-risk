@@ -105,7 +105,8 @@ def error_of(res):
 def test_partial_failure_keeps_the_other_clusters_and_no_error():
     res = run_collect(fail_cluster="c-uuid-1")
     assert error_of(res) is None
-    assert {o["key"]["name"] for o in res.get_json()["result"]} == {"cl02", "esx02"}
+    vmware_names = {o["key"]["name"] for o in res.get_json()["result"] if o["key"]["adapterKind"] == "VMWARE"}
+    assert vmware_names == {"cl02", "esx02"}
 
 
 def test_all_clusters_failing_is_reported():

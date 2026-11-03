@@ -50,6 +50,12 @@ looking like a healthy one with no data:
   warning listing what failed. Everything that did collect is still written; a
   value whose call failed has no data that cycle, never a guess.
 - Every cycle logs, at INFO, `Suite API: <n> calls, <f> failed, <s> stale, <t>s`.
+- A partial failure is also visible without `adapter.log`: the adapter
+  instance object itself carries `Collection Health|Warnings in Last Cycle`
+  (how many warnings the cycle logged) and, if there were any,
+  `Collection Health|First Warning` (the first one, naming what and why).
+  A total failure is already visible through the adapter instance's error
+  state above, so Collection Health does not duplicate it.
 
 ## License
 

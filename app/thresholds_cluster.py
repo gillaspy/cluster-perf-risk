@@ -62,3 +62,18 @@ WEIGHTS = {
     METRIC_CLUSTER_CPU_OVERCOMMIT_RATIO: 1.0,
     METRIC_CLUSTER_MEMORY_OVERCOMMIT_RATIO: 1.0,
 }
+
+# Metric keys where green is not an informative signal -- see
+# scoring.compute_composite(). An overcommit ratio under 1 means "not
+# overcommitted", not "healthy", and a cluster that is simply not busy is
+# not a sign of good performance -- it would otherwise add a free floor-0 to
+# the weighted average every cycle. Matches the vSphere Cluster Performance
+# Risk matrix this pack's thresholds were transcribed from (Iwan Rahabok's
+# e1-rahabok/VCF-vCommunity-Adapter Cluster Risk KPI: CPU Thread Utilization
+# Excluded below 60, CPU/Memory Overcommit Ratio Excluded below 1 -- the same
+# green_max values used here).
+EXCLUDED_WHEN_GREEN = frozenset({
+    METRIC_CPU_THREAD_UTILIZATION,
+    METRIC_CLUSTER_CPU_OVERCOMMIT_RATIO,
+    METRIC_CLUSTER_MEMORY_OVERCOMMIT_RATIO,
+})

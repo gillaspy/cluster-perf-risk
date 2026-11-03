@@ -80,3 +80,12 @@ WEIGHTS = {
     METRIC_CPU_MONSTER_VM_SIZE_RATIO: 1.25,
     METRIC_MEMORY_MONSTER_VM_SIZE_RATIO: 1.25,
 }
+
+# Metric keys where green is not an informative signal -- see
+# scoring.compute_composite(). Dropped packets are rare, so an exact 0 says
+# nothing about health; it would otherwise add a free floor-0 to the
+# weighted average every cycle. Matches the vSphere Cluster Performance Risk
+# matrix this pack's thresholds were transcribed from (Iwan Rahabok's
+# e1-rahabok/VCF-vCommunity-Adapter: "ESXi Bad Network Packets" is Excluded
+# at exactly 0, same reasoning).
+EXCLUDED_WHEN_GREEN = frozenset({METRIC_HOST_DROPPED_PACKETS})

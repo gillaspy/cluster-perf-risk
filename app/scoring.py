@@ -38,7 +38,10 @@ def classify_band(value: float | None, metric_key: str, band_bounds: dict) -> st
 
 
 def compute_composite(
-    metric_values: dict[str, float | None], band_bounds: dict, weights: dict
+    metric_values: dict[str, float | None],
+    band_bounds: dict,
+    weights: dict,
+    excluded_when_green: frozenset[str] = frozenset(),
 ) -> tuple[float, str, dict[str, str]]:
     """
     metric_values: {metric_key: value_or_None}
@@ -51,6 +54,17 @@ def compute_composite(
 
     Band: the worst band among the known sub-metrics (red > orange > yellow >
     green), "unknown" when none is known.
+
+    excluded_when_green: metric keys where green is not an informative signal
+    (e.g. an overcommit ratio under 1 just means "not overcommitted", not
+    "healthy") -- see each scope's EXCLUDED_WHEN_GREEN. While such a metric is
+    green it is left out of the weighted-average term entirely, the same as
+    an unknown metric, so it cannot add a free floor-0 that pulls the
+    average toward "fine". It still gets a real per-metric band (always
+    "green" here) and still counts for the worst-band term, where it can
+    only ever push the band towards green -- never away from a worse band
+    elsewhere. If every known sub-metric ends up excluded this way, nothing
+    is wrong: the composite is 0.0 / "green", not "unknown".
     """
     per_metric_band: dict[str, str] = {}
     weighted_scores = []
@@ -66,19 +80,24 @@ def compute_composite(
         # the composite toward "green" even when real data is red/orange.
         if band == "unknown":
             continue
+        if band == "green" and key in excluded_when_green:
+            continue
         weight = weights.get(key, 1.0)
         weighted_scores.append(BAND_FLOORS.get(band, 0) * weight)
         total_weight += weight
 
     known_bands = [b for b in per_metric_band.values() if b != "unknown"]
-    if not known_bands or total_weight == 0:
+    if not known_bands:
         # Every sub-metric failed to collect -- report "unknown", not a false
         # "green". A broken collection should never look like a healthy cluster.
         return 0.0, "unknown", per_metric_band
 
     worst_band = max(known_bands, key=lambda b: BAND_FLOORS.get(b, 0))
     worst_floor = BAND_FLOORS.get(worst_band, 0)
-    weighted_avg = sum(weighted_scores) / total_weight
+    # total_weight is 0 when every known sub-metric was green-and-excluded
+    # (worst_band is then "green" too, from known_bands above), or when
+    # band_bounds/weights supplied no weighted metrics at all.
+    weighted_avg = sum(weighted_scores) / total_weight if total_weight else 0.0
 
     composite = round(min(100.0, max(0.0, 0.7 * worst_floor + 0.3 * weighted_avg)), 1)
 
