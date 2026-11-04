@@ -1,3 +1,24 @@
+# Migrating to 2.3.1
+
+2.3.1 changes only how the shipped dashboard is built (and the docs); the
+adapter, metrics and thresholds are the same as 2.3.0.
+
+## The dashboard installs cleanly now -- no need to delete it first
+Every release now stamps the "Cluster Performance Risk" dashboard with an id
+and uuid derived from that release's version (see `build-and-publish.yml`).
+Installing the pak over an existing dashboard with the *same* id is what left
+every widget unconfigured on 2.1.1 and 2.2.0 (see "Migrating to 2.1.1"
+below); a new id per release means every install creates a fresh,
+correctly-configured dashboard instead.
+
+- Install the pak as usual ("Install the PAK file even if it is already
+  installed"); open the new dashboard from Dashboards > All.
+- Deleting the previous copy first is no longer required. It is left behind,
+  pointing at nothing current -- delete it from Dashboards > Manage whenever
+  convenient.
+- **Do not import this dashboard from a file.** Still true -- see "Migrating
+  to 2.1.1" below.
+
 # Migrating to 2.2.0
 
 2.2.0 adds and redefines risk sub-metrics, so **some objects change color

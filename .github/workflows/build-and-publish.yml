@@ -12,6 +12,9 @@
 #   reads the digest back out of the pak to scan, sign and attest it.
 # - Pull requests (including from forks) only run `verify`, with a read-only
 #   token. Nothing is published except from a v* tag pushed to this repo.
+# - The shipped dashboard's id and uuid are stamped from the tag the same way
+#   (runner copy only), so every release's install creates a fresh dashboard
+#   instead of overwriting the previous one in place -- see MIGRATION.md.
 #
 # Releasing: merge to the default branch, then
 #   git tag vX.Y.Z && git push origin vX.Y.Z
@@ -270,6 +273,40 @@ jobs:
               if json.load(f)["version"] != version:
                   sys.exit("manifest.txt did not take the stamped version")
           print(f"manifest.txt version {committed} -> {version} (this runner only; the committed file is unchanged)")
+          EOF
+
+      - name: Stamp the dashboard id from the tag (runner copy only, never committed)
+        working-directory: ${{ env.PROJECT_DIR }}
+        env:
+          VERSION: ${{ steps.tag.outputs.version }}
+        run: |
+          set -euo pipefail
+          # Installing a pak over an existing dashboard with the same id left
+          # every widget unconfigured (verified on 2.1.1 and 2.2.0; see
+          # MIGRATION.md). Giving each release's dashboard its own id, derived
+          # from the version, makes every install create a fresh object
+          # instead of overwriting the previous one in place.
+          python3 - "$VERSION" <<'EOF'
+          import json, sys, uuid
+          version = sys.argv[1]
+          path = "content/dashboards/cluster_performance_risk.json"
+          with open(path, encoding="utf-8") as f:
+              content = json.load(f)
+          if len(content["dashboards"]) != 1:
+              sys.exit(f"expected exactly one dashboard in {path}, found {len(content['dashboards'])}")
+          db = content["dashboards"][0]
+          old_uuid, old_id = content["uuid"], db["id"]
+          base = "https://github.com/gillaspy/cluster-perf-risk/dashboards/cluster_performance_risk"
+          content["uuid"] = str(uuid.uuid5(uuid.NAMESPACE_URL, f"{base}#uuid@{version}"))
+          db["id"] = str(uuid.uuid5(uuid.NAMESPACE_URL, f"{base}#id@{version}"))
+          with open(path, "w", encoding="utf-8") as f:
+              json.dump(content, f, indent=4, ensure_ascii=False)
+              f.write("\n")
+          with open(path, encoding="utf-8") as f:
+              reloaded = json.load(f)
+          if reloaded["uuid"] != content["uuid"] or reloaded["dashboards"][0]["id"] != db["id"]:
+              sys.exit(f"{path} did not take the stamped id")
+          print(f"dashboard uuid {old_uuid} -> {content['uuid']}, id {old_id} -> {db['id']} (this runner only; the committed file is unchanged)")
           EOF
 
       - name: mp-build (builds, pushes to GHCR, writes the digest into the pak)
